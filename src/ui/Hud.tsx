@@ -33,13 +33,13 @@ export default function Hud() {
           className="font-mono text-[11px] text-ink-dim"
           style={{ letterSpacing: '0.18em' }}
         >
-          drag · zoom · stations arrive next
+          drag to orbit · click gtm to inspect · esc to close
         </div>
         <div
           className="font-mono text-[11px] text-ink-dim"
           style={{ letterSpacing: '0.18em' }}
         >
-          step 01 / 08 — empty stage
+          step 02 / 08 — gtm vertical slice
         </div>
       </footer>
     </div>

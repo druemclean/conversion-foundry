@@ -6,8 +6,13 @@ import Lights from './Lights';
 import Ground from './Ground';
 import Starfield from './Starfield';
 import Effects from './Effects';
+import CameraRig from './CameraRig';
+import Gtm from './stations/Gtm';
+import { useSelection } from '../state/selection';
 
 export default function Scene() {
+  const { select } = useSelection();
+
   return (
     <Canvas
       shadows
@@ -24,25 +29,30 @@ export default function Scene() {
         scene.fog = new THREE.Fog('#02030a', 28, 110);
         scene.background = null;
       }}
+      onPointerMissed={() => select(null)}
     >
       <Suspense fallback={null}>
         <Environment preset="warehouse" environmentIntensity={0.55} />
         <Lights />
         <Ground />
         <Starfield />
+
+        <Gtm />
+
         <Effects />
         <OrbitControls
           makeDefault
           enableDamping
           dampingFactor={0.08}
           enablePan={false}
-          minDistance={9}
+          minDistance={6}
           maxDistance={42}
           minPolarAngle={0.15}
           maxPolarAngle={Math.PI * 0.49}
           autoRotate
           autoRotateSpeed={0.18}
         />
+        <CameraRig />
       </Suspense>
     </Canvas>
   );

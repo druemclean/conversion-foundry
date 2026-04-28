@@ -19,6 +19,10 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
 
   const isHovered = state.hoveredId === station.id;
   const isSelected = state.selectedId === station.id;
+  const someoneElseActive =
+    (state.selectedId !== null && state.selectedId !== station.id) ||
+    (state.hoveredId !== null && state.hoveredId !== station.id);
+  const labelOpacity = isHovered || isSelected ? 1 : someoneElseActive ? 0 : 0.45;
 
   useEffect(() => {
     if (isHovered) document.body.style.cursor = 'pointer';
@@ -88,7 +92,7 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
           style={{
             fontSize: '11px',
             letterSpacing: '0.18em',
-            opacity: isHovered || isSelected ? 1 : 0.45,
+            opacity: labelOpacity,
             textShadow: '0 1px 14px rgba(2,3,10,0.85)',
           }}
         >

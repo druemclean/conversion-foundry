@@ -1,39 +1,37 @@
 export default function Lights() {
   return (
     <>
-      <hemisphereLight
-        args={['#5fd4ff', '#1b1208', 0.35]}
-        position={[0, 30, 0]}
-      />
+      {/* Lifted hemisphere so shadowed sides of stations still read */}
+      <hemisphereLight args={['#7fc8ff', '#241808', 0.65]} position={[0, 30, 0]} />
 
+      {/* Soft key — radius gives PCF softness so shadows don't read as a single
+          hard diagonal across the ground when stations cluster. */}
       <directionalLight
-        position={[12, 18, 8]}
-        intensity={1.6}
+        position={[12, 22, 8]}
+        intensity={1.05}
         color="#fff4e0"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={1}
-        shadow-camera-far={60}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
+        shadow-camera-far={80}
+        shadow-camera-left={-40}
+        shadow-camera-right={40}
+        shadow-camera-top={40}
+        shadow-camera-bottom={-40}
         shadow-bias={-0.0005}
         shadow-normalBias={0.04}
+        shadow-radius={6}
       />
 
-      <directionalLight
-        position={[-14, 8, -10]}
-        intensity={0.45}
-        color="#5fd4ff"
-      />
+      {/* Cyan rim from opposite side */}
+      <directionalLight position={[-14, 8, -10]} intensity={0.55} color="#5fd4ff" />
 
-      <directionalLight
-        position={[0, 4, 18]}
-        intensity={0.25}
-        color="#d96fff"
-      />
+      {/* Magenta back-fill so silhouettes don't vanish when in shadow */}
+      <directionalLight position={[0, 4, -16]} intensity={0.35} color="#d96fff" />
+
+      {/* Warm front-fill */}
+      <directionalLight position={[6, 3, 14]} intensity={0.25} color="#ffb054" />
     </>
   );
 }

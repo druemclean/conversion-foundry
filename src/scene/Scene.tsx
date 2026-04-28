@@ -8,6 +8,10 @@ import Starfield from './Starfield';
 import Effects from './Effects';
 import CameraRig from './CameraRig';
 import Gtm from './stations/Gtm';
+import Website from './stations/Website';
+import Consent from './stations/Consent';
+import GoogleAds from './stations/GoogleAds';
+import Ga4 from './stations/Ga4';
 import { useSelection } from '../state/selection';
 
 export default function Scene() {
@@ -15,7 +19,7 @@ export default function Scene() {
 
   return (
     <Canvas
-      shadows
+      shadows={{ type: THREE.PCFSoftShadowMap }}
       dpr={[1, 2]}
       gl={{
         antialias: true,
@@ -37,7 +41,11 @@ export default function Scene() {
         <Ground />
         <Starfield />
 
+        <Website />
+        <Consent />
         <Gtm />
+        <GoogleAds />
+        <Ga4 />
 
         <Effects />
         <OrbitControls

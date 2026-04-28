@@ -16,8 +16,13 @@ const DEFAULT_POS = new THREE.Vector3(14, 9, 16);
 const DEFAULT_TARGET = new THREE.Vector3(0, 0.8, 0);
 
 function offsetForStation(pos: [number, number, number]): THREE.Vector3 {
-  // Camera lands forward and to the right of the station, slightly above it.
-  return new THREE.Vector3(pos[0] + 5.0, pos[1] + 3.4, pos[2] + 5.6);
+  const v = new THREE.Vector3(...pos);
+  // Stations at the origin (GTM) get a fixed front-right framing.
+  if (v.length() < 0.5) return new THREE.Vector3(5.2, 3.6, 6.0);
+  // For everything else, push the camera radially outward from the origin so
+  // it always views the station against open space rather than the next station.
+  const dir = v.clone().normalize();
+  return v.clone().add(dir.multiplyScalar(5.5)).setY(pos[1] + 3.0);
 }
 
 function lookAtForStation(pos: [number, number, number]): THREE.Vector3 {
@@ -50,8 +55,6 @@ export default function CameraRig() {
       targetPos.current.copy(offsetForStation(station.position));
       targetLook.current.copy(lookAtForStation(station.position));
     } else if (userInteracted.current) {
-      // Don't yank a user who's been orbiting freely.
-      // Only reset look-at if camera isn't locked elsewhere.
       targetLook.current.copy(DEFAULT_TARGET);
     } else {
       targetPos.current.copy(DEFAULT_POS);
@@ -60,13 +63,17 @@ export default function CameraRig() {
   }, [state.selectedId, controls]);
 
   useFrame((_, delta) => {
-    // Frame-rate-independent ease-out (~0.6s feel).
     const t = 1 - Math.pow(0.0009, delta);
     if (state.selectedId) {
-      camera.position.lerp(targetPos.current, t);
+      // Stop lerping once close enough so OrbitControls can take over freely.
+      if (camera.position.distanceTo(targetPos.current) > 0.05) {
+        camera.position.lerp(targetPos.current, t);
+      }
     }
     if (controls) {
-      controls.target.lerp(targetLook.current, t);
+      if (controls.target.distanceTo(targetLook.current) > 0.05) {
+        controls.target.lerp(targetLook.current, t);
+      }
       controls.update();
     }
   });

@@ -2,10 +2,10 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import StationFrame from './StationFrame';
-import { STATIONS } from '../../data/stations';
+import { getStation } from '../../data/stations';
 import { useSelection } from '../../state/selection';
 
-const station = STATIONS.find((s) => s.id === 'gtm')!;
+const station = getStation('gtm')!;
 const ACCENT = station.accent;
 
 const SHELL = '#0d1828';

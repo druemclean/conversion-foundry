@@ -39,7 +39,7 @@ export default function Hud() {
           className="font-mono text-[11px] text-ink-dim"
           style={{ letterSpacing: '0.18em' }}
         >
-          step 02 / 08 — gtm vertical slice
+          step 03 / 08 — category templates
         </div>
       </footer>
     </div>

@@ -1,0 +1,45 @@
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/jetbrains-mono/300.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-deep: #02030a;
+  --bg-mid: #0d1424;
+  --ink: #e8ecf3;
+  --ink-dim: #a8b3c8;
+  --accent-cyan: #5fd4ff;
+  --accent-amber: #ffb054;
+  --accent-magenta: #d96fff;
+  --accent-green: #6fe39a;
+
+  color-scheme: dark;
+  color: var(--ink);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, #0d1424 0%, #02030a 70%);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  outline: none;
+  touch-action: none;
+}

@@ -3,9 +3,10 @@ import { Grid } from '@react-three/drei';
 export default function Ground() {
   return (
     <group>
-      {/* Base disc — low-metalness so the HDRI doesn't smear dark bands across it */}
+      {/* Base disc — extends far enough that its edge is always inside dense
+          fog, so it dissolves into the backdrop's bottom stop seamlessly */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, -0.001, 0]}>
-        <circleGeometry args={[60, 96]} />
+        <circleGeometry args={[160, 128]} />
         <meshStandardMaterial
           color="#0a1020"
           roughness={0.92}

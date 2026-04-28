@@ -2,10 +2,10 @@ export default function Hud() {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between">
       <header className="flex items-start justify-between p-8">
-        <div>
+        <div className="hud-plate max-w-[480px]">
           <div
-            className="font-mono text-[11px] uppercase text-ink-dim"
-            style={{ letterSpacing: '0.18em' }}
+            className="font-mono uppercase text-ink-dim"
+            style={{ fontSize: '11px', letterSpacing: '0.18em' }}
           >
             OpGo · Internal training
           </div>
@@ -15,14 +15,15 @@ export default function Hud() {
           >
             Conversion Tracking Foundry
           </h1>
-          <p className="mt-2 max-w-md text-[14px] text-ink-dim">
+          <p className="mt-2 text-[14px] text-ink-dim">
             A 3D explainer of how a click becomes a measured conversion — and the
             machinery that carries it across browsers, servers, and ad platforms.
           </p>
         </div>
+
         <div
-          className="hidden font-mono text-[11px] uppercase text-ink-dim md:block"
-          style={{ letterSpacing: '0.18em' }}
+          className="hud-plate hidden font-mono uppercase text-ink-dim md:block"
+          style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
           v0.1 · scaffold
         </div>
@@ -30,14 +31,14 @@ export default function Hud() {
 
       <footer className="flex items-end justify-between p-8">
         <div
-          className="font-mono text-[11px] text-ink-dim"
-          style={{ letterSpacing: '0.18em' }}
+          className="hud-plate font-mono text-ink-dim"
+          style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
           drag to orbit · click gtm to inspect · esc to close
         </div>
         <div
-          className="font-mono text-[11px] text-ink-dim"
-          style={{ letterSpacing: '0.18em' }}
+          className="hud-plate font-mono text-ink-dim"
+          style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
           step 03 / 08 — category templates
         </div>

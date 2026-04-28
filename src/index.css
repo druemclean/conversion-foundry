@@ -12,6 +12,7 @@
   --bg-mid: #0d1424;
   --ink: #e8ecf3;
   --ink-dim: #a8b3c8;
+  --rule: rgba(255, 255, 255, 0.08);
   --accent-cyan: #5fd4ff;
   --accent-amber: #ffb054;
   --accent-magenta: #d96fff;
@@ -23,6 +24,37 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Cohesive frosted-glass plate used by every HUD block. The blur is what
+   carries the editorial weight; the bg is just a tint to keep small text
+   legible against busy emissive content. */
+.hud-plate {
+  background: rgba(13, 20, 36, 0.32);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 20px;
+}
+
+/* Slim styled scrollbar for the side panel's scrollable content. */
+.panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+.panel-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
 }
 
 html, body, #root {

@@ -15,6 +15,15 @@ import GoogleAds from './stations/GoogleAds';
 import Ga4 from './stations/Ga4';
 import { useSelection } from '../state/selection';
 
+function cameraPos(): [number, number, number] {
+  if (typeof window === 'undefined') return [14, 9, 16];
+  const cam = new URLSearchParams(window.location.search).get('cam');
+  if (!cam) return [14, 9, 16];
+  const parts = cam.split(',').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return [14, 9, 16];
+  return parts as [number, number, number];
+}
+
 export default function Scene() {
   const { select } = useSelection();
 
@@ -29,7 +38,7 @@ export default function Scene() {
         toneMapping: THREE.NoToneMapping,
         outputColorSpace: THREE.SRGBColorSpace,
       }}
-      camera={{ position: [14, 9, 16], fov: 38, near: 0.1, far: 200 }}
+      camera={{ position: cameraPos(), fov: 38, near: 0.1, far: 220 }}
       onCreated={({ scene }) => {
         // Fog far must reach to the ground edge so the disc dissolves into
         // the backdrop's bottom stop. Color matches the backdrop's bottom.

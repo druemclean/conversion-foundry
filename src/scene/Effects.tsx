@@ -12,17 +12,25 @@ import { Vector2 } from 'three';
 export default function Effects() {
   return (
     <EffectComposer multisampling={0} enableNormalPass>
+      {/* SSAO tuned for top-down + distant orbit angles. Previous settings
+          (intensity 18, worldDistanceThreshold 20) produced a hard wedge on
+          the ground because the threshold cut occlusion off abruptly across
+          the visible ground plane and the high intensity amplified the seam.
+          Now: lower intensity for a true subtle ambient effect, much larger
+          world distance window so the falloff is gradual, and more samples
+          to reduce per-pixel banding on flat surfaces. */}
       <SSAO
         blendFunction={BlendFunction.MULTIPLY}
-        samples={16}
-        radius={0.18}
-        intensity={18}
-        luminanceInfluence={0.6}
-        worldDistanceThreshold={20}
-        worldDistanceFalloff={4}
+        samples={31}
+        rings={4}
+        radius={0.32}
+        intensity={3.2}
+        luminanceInfluence={0.5}
+        worldDistanceThreshold={120}
+        worldDistanceFalloff={40}
         worldProximityThreshold={6}
         worldProximityFalloff={2}
-        bias={0.025}
+        bias={0.04}
       />
       <Bloom
         intensity={0.75}

@@ -8,52 +8,6 @@ import { useSelection } from '../../state/selection';
 const station = getStation('attribution')!;
 const ACCENT = station.accent;
 
-const CONVERGE_LINES = 6;
-const LINE_RADIUS = 5.5;
-// Lines start in local space below the summit (y = -8 in local = ground level
-// in world since Attribution sits at world y=8) and end at the crystal center.
-const LINE_END = new THREE.Vector3(0, 0, 0);
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
-
-function lineStart(i: number): THREE.Vector3 {
-  const a = (i / CONVERGE_LINES) * Math.PI * 2;
-  return new THREE.Vector3(Math.cos(a) * LINE_RADIUS, -8, Math.sin(a) * LINE_RADIUS);
-}
-
-type ConvergingLineProps = {
-  startWorld: THREE.Vector3;
-  endWorld: THREE.Vector3;
-  matRef: (m: THREE.MeshStandardMaterial | null) => void;
-};
-
-function ConvergingLine({ startWorld, endWorld, matRef }: ConvergingLineProps) {
-  // Compute orientation: a Y-axis cylinder rotated so its +Y matches the
-  // start->end direction, then positioned at the midpoint.
-  const dir = endWorld.clone().sub(startWorld);
-  const len = dir.length();
-  const mid = startWorld.clone().add(dir.clone().multiplyScalar(0.5));
-  const quat = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, dir.clone().normalize());
-  const euler = new THREE.Euler().setFromQuaternion(quat);
-
-  return (
-    <mesh
-      position={mid.toArray()}
-      rotation={[euler.x, euler.y, euler.z]}
-    >
-      <cylinderGeometry args={[0.022, 0.022, len, 8]} />
-      <meshStandardMaterial
-        ref={matRef}
-        color={ACCENT}
-        emissive={ACCENT}
-        emissiveIntensity={1.0}
-        transparent
-        opacity={0.75}
-        toneMapped={false}
-      />
-    </mesh>
-  );
-}
-
 export default function Attribution() {
   return (
     <StationFrame station={station} labelOffsetY={2.0} haloRadius={1.6}>
@@ -68,7 +22,6 @@ function Geometry() {
 
   const crystalRef = useRef<THREE.Group>(null);
   const innerCoreRef = useRef<THREE.MeshStandardMaterial>(null);
-  const lineRefs = useRef<Array<THREE.MeshStandardMaterial | null>>([]);
 
   useFrame((s, delta) => {
     const t = s.clock.elapsedTime;
@@ -84,11 +37,6 @@ function Geometry() {
         delta,
       );
     }
-    lineRefs.current.forEach((m, i) => {
-      if (!m) return;
-      const phase = i * 0.8;
-      m.emissiveIntensity = (isActive ? 1.6 : 1.0) * (0.4 + (Math.sin(t * 1.1 + phase) + 1) * 0.3);
-    });
   });
 
   return (
@@ -135,16 +83,6 @@ function Geometry() {
         </mesh>
       </group>
 
-      {Array.from({ length: CONVERGE_LINES }).map((_, i) => (
-        <ConvergingLine
-          key={i}
-          startWorld={lineStart(i)}
-          endWorld={LINE_END}
-          matRef={(m) => {
-            lineRefs.current[i] = m;
-          }}
-        />
-      ))}
     </group>
   );
 }

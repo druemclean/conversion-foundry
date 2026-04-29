@@ -40,7 +40,7 @@ export default function Hud() {
           className="hud-plate font-mono text-ink-dim"
           style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
-          step 04 / 08 — full station roster
+          step 05 / 08 — routes & flowing capsules
         </div>
       </footer>
     </div>

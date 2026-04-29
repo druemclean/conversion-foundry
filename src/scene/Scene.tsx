@@ -20,6 +20,7 @@ import Sgtm from './stations/Sgtm';
 import Zapier from './stations/Zapier';
 import FileUpload from './stations/FileUpload';
 import Attribution from './stations/Attribution';
+import RouteSystem from './routes/RouteSystem';
 import { useSelection } from '../state/selection';
 
 function cameraPos(): [number, number, number] {
@@ -83,6 +84,8 @@ export default function Scene() {
         {/* Observatories */}
         <Ga4 />
         <Attribution />
+
+        <RouteSystem />
 
         <Effects />
         <OrbitControls

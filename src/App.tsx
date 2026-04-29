@@ -4,6 +4,7 @@ import Hud from './ui/Hud';
 import InfoPanel from './ui/InfoPanel';
 import Tooltip from './ui/Tooltip';
 import SideRail from './ui/SideRail';
+import Loader from './ui/Loader';
 import { SelectionProvider, useSelection } from './state/selection';
 
 function AppInner() {
@@ -42,6 +43,7 @@ function AppInner() {
       <SideRail />
       <InfoPanel />
       <Tooltip />
+      <Loader />
     </div>
   );
 }

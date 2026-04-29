@@ -41,7 +41,7 @@ export default function SideRail() {
 
   return (
     <aside
-      className="pointer-events-auto absolute left-8 z-20 w-[280px]"
+      className="side-rail pointer-events-auto absolute left-8 z-20 w-[280px]"
       style={{ top: 220 }}
     >
       <div className="hud-plate" style={{ padding: 18 }}>

@@ -57,6 +57,28 @@
   background: rgba(255, 255, 255, 0.26);
 }
 
+/* --- Mobile responsiveness ---
+   Below 900px the side rail and version meta plate would crowd the canvas.
+   Below 640px the title plate scales down so it doesn't dominate the view. */
+@media (max-width: 900px) {
+  .hud-meta-plate { display: none !important; }
+  .side-rail { display: none !important; }
+  .hud-hint-plate { display: none !important; }
+}
+
+@media (max-width: 640px) {
+  .hud-title-plate {
+    padding: 14px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  .hud-title-plate h1 {
+    font-size: 28px !important;
+  }
+  .hud-title-plate p {
+    font-size: 12px !important;
+  }
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;

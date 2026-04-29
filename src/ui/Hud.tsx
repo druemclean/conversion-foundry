@@ -2,7 +2,7 @@ export default function Hud() {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between">
       <header className="flex items-start justify-between p-8">
-        <div className="hud-plate max-w-[480px]">
+        <div className="hud-plate hud-title-plate max-w-[480px]">
           <div
             className="font-mono uppercase text-ink-dim"
             style={{ fontSize: '11px', letterSpacing: '0.18em' }}
@@ -22,7 +22,7 @@ export default function Hud() {
         </div>
 
         <div
-          className="hud-plate hidden font-mono uppercase text-ink-dim md:block"
+          className="hud-plate hud-meta-plate hidden font-mono uppercase text-ink-dim md:block"
           style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
           v0.1 · scaffold
@@ -31,16 +31,16 @@ export default function Hud() {
 
       <footer className="flex items-end justify-between p-8">
         <div
-          className="hud-plate font-mono text-ink-dim"
+          className="hud-plate hud-hint-plate font-mono text-ink-dim"
           style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
-          drag to orbit · click gtm to inspect · esc to close
+          drag to orbit · click a station · esc to close · ▶ guided
         </div>
         <div
-          className="hud-plate font-mono text-ink-dim"
+          className="hud-plate hud-hint-plate font-mono text-ink-dim"
           style={{ fontSize: '11px', letterSpacing: '0.18em' }}
         >
-          step 06 / 08 — guided "follow an event"
+          step 07 / 08 — polish pass
         </div>
       </footer>
     </div>

@@ -19,6 +19,7 @@ export type TourState = {
 type State = {
   selectedId: string | null;
   hoveredId: string | null;
+  hoveredRouteId: string | null;
   cursor: CursorPos | null;
   tour: TourState;
 };
@@ -26,6 +27,7 @@ type State = {
 type Action =
   | { type: 'select'; id: string | null }
   | { type: 'hover'; id: string | null }
+  | { type: 'hoverRoute'; id: string | null }
   | { type: 'cursor'; pos: CursorPos | null }
   | { type: 'tourStart' }
   | { type: 'tourStop' }
@@ -34,6 +36,7 @@ type Action =
 const initial: State = {
   selectedId: null,
   hoveredId: null,
+  hoveredRouteId: null,
   cursor: null,
   tour: { active: false, index: 0 },
 };
@@ -50,6 +53,8 @@ function reducer(state: State, action: Action): State {
       };
     case 'hover':
       return { ...state, hoveredId: action.id };
+    case 'hoverRoute':
+      return { ...state, hoveredRouteId: action.id };
     case 'cursor':
       return { ...state, cursor: action.pos };
     case 'tourStart':
@@ -76,6 +81,7 @@ type Ctx = {
   state: State;
   select: (id: string | null) => void;
   hover: (id: string | null) => void;
+  hoverRoute: (id: string | null) => void;
   setCursor: (pos: CursorPos | null) => void;
   tourStart: () => void;
   tourStop: () => void;
@@ -89,6 +95,10 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
 
   const select = useCallback((id: string | null) => dispatch({ type: 'select', id }), []);
   const hover = useCallback((id: string | null) => dispatch({ type: 'hover', id }), []);
+  const hoverRoute = useCallback(
+    (id: string | null) => dispatch({ type: 'hoverRoute', id }),
+    [],
+  );
   const setCursor = useCallback(
     (pos: CursorPos | null) => dispatch({ type: 'cursor', pos }),
     [],
@@ -101,8 +111,8 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, select, hover, setCursor, tourStart, tourStop, tourGoto }),
-    [state, select, hover, setCursor, tourStart, tourStop, tourGoto],
+    () => ({ state, select, hover, hoverRoute, setCursor, tourStart, tourStop, tourGoto }),
+    [state, select, hover, hoverRoute, setCursor, tourStart, tourStop, tourGoto],
   );
 
   return <SelectionCtx.Provider value={value}>{children}</SelectionCtx.Provider>;

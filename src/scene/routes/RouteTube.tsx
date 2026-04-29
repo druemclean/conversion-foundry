@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { RouteDatum } from '../../data/routes';
+import { useSelection } from '../../state/selection';
 
 type RouteTubeProps = {
   route: RouteDatum;
@@ -12,19 +14,41 @@ const CURVE_SEGMENTS = 96;
 const TUBE_SEGMENTS = 8;
 
 export default function RouteTube({ route, curve }: RouteTubeProps) {
+  const { state, hoverRoute } = useSelection();
+  const isHovered = state.hoveredRouteId === route.id;
+
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
+
   const tubeGeom = useMemo(() => {
     if (route.style === 'alternative' || route.style === 'manual') return null;
     return new THREE.TubeGeometry(curve, CURVE_SEGMENTS, 0.055, TUBE_SEGMENTS, false);
   }, [route.style, curve]);
 
-  // Sample points for the dashed Line variants.
   const dashedPoints = useMemo(() => {
     if (route.style !== 'alternative' && route.style !== 'manual') return null;
     return curve.getPoints(CURVE_SEGMENTS) as THREE.Vector3[];
   }, [route.style, curve]);
 
+  // Animate emissive bump when this tube is hovered.
+  useFrame((_, delta) => {
+    if (!matRef.current) return;
+    const baseEmissive = route.style === 'import' ? 0.32 : 0.45;
+    const baseOpacity = route.style === 'import' ? 0.18 : 0.22;
+    matRef.current.emissiveIntensity = THREE.MathUtils.damp(
+      matRef.current.emissiveIntensity,
+      isHovered ? baseEmissive * 2.4 : baseEmissive,
+      6,
+      delta,
+    );
+    matRef.current.opacity = THREE.MathUtils.damp(
+      matRef.current.opacity,
+      isHovered ? baseOpacity * 2.0 : baseOpacity,
+      6,
+      delta,
+    );
+  });
+
   if (route.style === 'alternative') {
-    // sGTM routes — thin, dashed, very dim, no bloom contribution.
     return (
       <Line
         points={dashedPoints!}
@@ -40,7 +64,6 @@ export default function RouteTube({ route, curve }: RouteTubeProps) {
   }
 
   if (route.style === 'manual') {
-    // File-upload routes — widely spaced dashes.
     return (
       <Line
         points={dashedPoints!}
@@ -55,13 +78,26 @@ export default function RouteTube({ route, curve }: RouteTubeProps) {
     );
   }
 
-  // default + import: solid translucent emissive tube
   const baseOpacity = route.style === 'import' ? 0.18 : 0.22;
   const baseEmissive = route.style === 'import' ? 0.32 : 0.45;
 
+  const onPointerOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    hoverRoute(route.id);
+  };
+  const onPointerOut = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    hoverRoute(null);
+  };
+
   return (
-    <mesh geometry={tubeGeom!}>
+    <mesh
+      geometry={tubeGeom!}
+      onPointerOver={onPointerOver}
+      onPointerOut={onPointerOut}
+    >
       <meshStandardMaterial
+        ref={matRef}
         color={route.color}
         emissive={route.color}
         emissiveIntensity={baseEmissive}

@@ -12,8 +12,8 @@ type OrbitLike = {
   removeEventListener: (e: string, h: () => void) => void;
 };
 
-const DEFAULT_POS = new THREE.Vector3(14, 9, 16);
-const DEFAULT_TARGET = new THREE.Vector3(0, 0.8, 0);
+const DEFAULT_POS = new THREE.Vector3(16, 11, 18);
+const DEFAULT_TARGET = new THREE.Vector3(0, 2.2, 0);
 
 function offsetForStation(pos: [number, number, number]): THREE.Vector3 {
   const v = new THREE.Vector3(...pos);

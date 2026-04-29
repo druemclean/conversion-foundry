@@ -13,14 +13,22 @@ import Website from './stations/Website';
 import Consent from './stations/Consent';
 import GoogleAds from './stations/GoogleAds';
 import Ga4 from './stations/Ga4';
+import Pixel from './stations/Pixel';
+import Capi from './stations/Capi';
+import Crm from './stations/Crm';
+import Sgtm from './stations/Sgtm';
+import Zapier from './stations/Zapier';
+import FileUpload from './stations/FileUpload';
+import Attribution from './stations/Attribution';
 import { useSelection } from '../state/selection';
 
 function cameraPos(): [number, number, number] {
-  if (typeof window === 'undefined') return [14, 9, 16];
+  const DEFAULT: [number, number, number] = [16, 11, 18];
+  if (typeof window === 'undefined') return DEFAULT;
   const cam = new URLSearchParams(window.location.search).get('cam');
-  if (!cam) return [14, 9, 16];
+  if (!cam) return DEFAULT;
   const parts = cam.split(',').map(Number);
-  if (parts.length !== 3 || parts.some(Number.isNaN)) return [14, 9, 16];
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return DEFAULT;
   return parts as [number, number, number];
 }
 
@@ -56,11 +64,25 @@ export default function Scene() {
         <Ground />
         <Starfield />
 
+        {/* Origin */}
         <Website />
+        <FileUpload />
+        <Crm />
+
+        {/* Connectors */}
         <Consent />
         <Gtm />
+        <Zapier />
+        <Sgtm />
+
+        {/* Hybrid platforms */}
         <GoogleAds />
+        <Pixel />
+        <Capi />
+
+        {/* Observatories */}
         <Ga4 />
+        <Attribution />
 
         <Effects />
         <OrbitControls

@@ -12,6 +12,8 @@ export type StationDatum = {
   fn: string;
   flow: Array<[string, string]>;
   takeaway: string;
+  /** Renders the station with reduced emissives + transparent shell. Used for sGTM. */
+  alternative?: boolean;
 };
 
 export const COLORS = {
@@ -107,6 +109,25 @@ export const STATIONS: StationDatum[] = [
       'Ads platforms need conversion data to bid smartly. Better data in means lower CPA out — and the gclid flowing back closes the loop.',
   },
   {
+    id: 'pixel',
+    name: 'Meta Pixel',
+    tag: 'AD PLATFORM · HYBRID',
+    accent: COLORS.magenta,
+    category: 'hybrid',
+    categoryLabel: CATEGORY_LABEL.hybrid,
+    position: [-2, 0, -6.5],
+    scale: 1.2,
+    fn: "Meta's browser-side tag. Fires standard events (PageView, Lead, Purchase) for Facebook and Instagram ad attribution and audience building. Also returns fbp/fbc cookies that ride along on outbound events.",
+    flow: [
+      ['fbp', 'browser cookie'],
+      ['fbc', 'click cookie, returned'],
+      ['event_id', 'dedupe key'],
+      ['custom_data', 'value, content_ids'],
+    ],
+    takeaway:
+      'Browser-only tracking is increasingly blocked by browsers and extensions. The pixel alone is not enough anymore.',
+  },
+  {
     id: 'ga4',
     name: 'GA4',
     tag: 'ANALYTICS',
@@ -124,6 +145,125 @@ export const STATIONS: StationDatum[] = [
     ],
     takeaway:
       'GA4 is for understanding behavior. It is not the source of truth for ad performance.',
+  },
+
+  // Mid level
+  {
+    id: 'crm',
+    name: 'CRM / Offline',
+    tag: 'OFFLINE SOURCE',
+    accent: COLORS.green,
+    category: 'origin',
+    categoryLabel: CATEGORY_LABEL.origin,
+    position: [-10, 4, -3],
+    scale: 1.0,
+    fn: 'Your CRM, sales database, or call tracker. The events that happen after the click but before the purchase, or entirely outside the browser. Closed deals, qualified leads, refunds.',
+    flow: [
+      ['lead → MQL', 'CRM update'],
+      ['lead → SQL', 'sales action'],
+      ['closed-won', 'final outcome'],
+      ['refund', 'negative signal'],
+    ],
+    takeaway:
+      'Most ad platforms do not learn what is a good lead unless you tell them. Offline conversions close that loop.',
+  },
+  {
+    id: 'zapier',
+    name: 'Zapier',
+    tag: 'CRM ROUTER',
+    accent: COLORS.green,
+    category: 'connector',
+    categoryLabel: CATEGORY_LABEL.connector,
+    position: [-3, 4, -4],
+    scale: 1.1,
+    fn: 'A no-code automation platform. Listens for CRM events (closed deals, qualified leads, refunds) and forwards them to ad platforms as offline conversions. The OpGo default for closing the loop on conversions that happen after the click.',
+    flow: [
+      ['trigger', 'CRM webhook or scheduled poll'],
+      ['transform', 'shape payload, hash PII'],
+      ['action', 'send to Google Ads, Meta CAPI, etc.'],
+    ],
+    takeaway:
+      'Zapier is the practical alternative to building your own server-side pipeline. Slower and more limited than sGTM, but takes 20 minutes to set up instead of 20 hours.',
+  },
+  {
+    id: 'sgtm',
+    name: 'Server-side GTM',
+    tag: 'ALT · NOT IN USE',
+    accent: COLORS.green,
+    category: 'connector',
+    categoryLabel: CATEGORY_LABEL.connector,
+    position: [-3.5, 4, -7],
+    scale: 1.0,
+    alternative: true,
+    fn: 'An alternative routing layer that runs on your own server instead of Zapier. Receives events from the browser, enriches them, and forwards to ad platforms. More reliable and private, but a significant lift to set up. OpGo doesn\'t currently use this, but it\'s the direction the industry is moving.',
+    flow: [
+      ['enrichment', 'add server data'],
+      ['transformations', 'reshape payload'],
+      ['CAPI dispatch', 'Meta, TikTok, etc.'],
+    ],
+    takeaway:
+      'An alternative routing layer that runs on your own server. More reliable and private than Zapier, but a significant lift to set up. Worth knowing exists; not what OpGo currently uses.',
+  },
+  {
+    id: 'capi',
+    name: 'Meta CAPI',
+    tag: 'CONVERSION API · HYBRID',
+    accent: COLORS.magenta,
+    category: 'hybrid',
+    categoryLabel: CATEGORY_LABEL.hybrid,
+    position: [5, 4, -7],
+    scale: 1.2,
+    fn: "Meta's Conversions API. The server-side complement to the Pixel. Sends conversion events directly from your server to Meta with hashed customer data for better matching.",
+    flow: [
+      ['em', 'hashed email'],
+      ['ph', 'hashed phone'],
+      ['event_id', 'matches Pixel for dedupe'],
+      ['action_source', 'website / system_generated'],
+    ],
+    takeaway:
+      'Pixel + CAPI together is the modern Meta setup. Same event sent both ways, deduped by event_id.',
+  },
+
+  // Origin (smaller, behind CRM)
+  {
+    id: 'fileupload',
+    name: 'File Upload',
+    tag: 'MANUAL · OCCASIONAL',
+    accent: COLORS.green,
+    category: 'origin',
+    categoryLabel: CATEGORY_LABEL.origin,
+    position: [-13, 0.5, -2],
+    scale: 0.85,
+    fn: 'A CSV of conversions uploaded directly to Google Ads or Meta. Used when neither GTM nor an automated CRM connection is available, or for retroactive backfills.',
+    flow: [
+      ['gclid', 'click identifier (Google)'],
+      ['email_hash', 'matching key (Meta)'],
+      ['conversion_time', 'when it happened'],
+      ['conversion_value', 'revenue or score'],
+    ],
+    takeaway:
+      'The fallback option. Manual but powerful. Best for one-off imports, fixing gaps in tracking, or platforms with no automated connection.',
+  },
+
+  // Summit
+  {
+    id: 'attribution',
+    name: 'Attribution Model',
+    tag: 'ANALYTICS',
+    accent: COLORS.cyan,
+    category: 'observatory',
+    categoryLabel: CATEGORY_LABEL.observatory,
+    position: [2, 8, -3],
+    scale: 1.0,
+    fn: 'The lens applied to all this data. Decides which touchpoint gets credit for a conversion when a user interacts with multiple channels.',
+    flow: [
+      ['last click', 'simple, default'],
+      ['data-driven', 'ML-weighted'],
+      ['position-based', 'first/last weighted'],
+      ['linear', 'equal credit'],
+    ],
+    takeaway:
+      'Attribution is a choice, not a fact. The same conversion can be credited completely differently depending on the model.',
   },
 ];
 

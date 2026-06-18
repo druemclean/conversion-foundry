@@ -2,8 +2,11 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { useSelection } from '../../state/selection';
+import { useFocus, useSelection } from '../../state/selection';
 import type { StationDatum } from '../../data/stations';
+import { ANCHOR_OFFSET } from '../AnchorController';
+import { registerLabel } from '../../state/labelRegistry';
+import { stationIntroT } from '../../state/intro';
 
 type Props = {
   station: StationDatum;
@@ -12,20 +15,37 @@ type Props = {
   children: ReactNode;
 };
 
+const DIM_RATIO = 0.22;
+
+// Reticle cursor — a tighter, more deliberate hover affordance than the
+// browser pointer. Hotspot at (12, 12) centers the cross on the click point.
+const RETICLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1"/><line x1="12" y1="2" x2="12" y2="6" stroke="#fff" stroke-opacity="0.85" stroke-width="1"/><line x1="12" y1="18" x2="12" y2="22" stroke="#fff" stroke-opacity="0.85" stroke-width="1"/><line x1="2" y1="12" x2="6" y2="12" stroke="#fff" stroke-opacity="0.85" stroke-width="1"/><line x1="18" y1="12" x2="22" y2="12" stroke="#fff" stroke-opacity="0.85" stroke-width="1"/><circle cx="12" cy="12" r="1.5" fill="#fff" fill-opacity="0.9"/></svg>`;
+const RETICLE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(RETICLE_SVG)}") 12 12, pointer`;
+
 export default function StationFrame({ station, labelOffsetY, haloRadius, children }: Props) {
   const { state, select, hover } = useSelection();
+  const focus = useFocus();
   const groupRef = useRef<THREE.Group>(null);
   const haloRef = useRef<THREE.Mesh>(null);
+  const labelRef = useRef<HTMLDivElement | null>(null);
 
   const isHovered = state.hoveredId === station.id;
   const isSelected = state.selectedId === station.id;
-  const someoneElseActive =
-    (state.selectedId !== null && state.selectedId !== station.id) ||
-    (state.hoveredId !== null && state.hoveredId !== station.id);
-  const labelOpacity = isHovered || isSelected ? 1 : someoneElseActive ? 0 : 0.45;
+  const isFocusedOne = isHovered || isSelected;
+  const isDimmed = focus.active && focus.isStationDimmed(station.id);
+
+  // Station label opacity: focused full, dimmed faded, ambient mid.
+  const labelOpacity = isFocusedOne ? 1.0 : isDimmed ? 0.18 : focus.active ? 0.65 : 0.55;
+
+  // Initial CSS offset before AnchorController takes over on first frame.
+  // Static S anchor also mirrors the world Y so the label sits below the
+  // geometry rather than far above it.
+  const initialAnchor = station.labelAnchor ?? 'N';
+  const [initDx, initDy] = ANCHOR_OFFSET[initialAnchor];
+  const labelWorldY = station.labelAnchor === 'S' ? -labelOffsetY : labelOffsetY;
 
   useEffect(() => {
-    if (isHovered) document.body.style.cursor = 'pointer';
+    if (isHovered) document.body.style.cursor = RETICLE_CURSOR;
     return () => {
       document.body.style.cursor = '';
     };
@@ -34,7 +54,10 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
   useFrame((_, delta) => {
     const g = groupRef.current;
     if (!g) return;
-    const targetScale = station.scale * (isHovered ? 1.04 : 1.0);
+    const introT = stationIntroT(station.id);
+    // Subtle scale settle during intro reveal — stations grow into place.
+    const introScale = 0.94 + 0.06 * introT;
+    const targetScale = station.scale * (isHovered ? 1.04 : 1.0) * introScale;
     g.scale.x = THREE.MathUtils.damp(g.scale.x, targetScale, 8, delta);
     g.scale.y = THREE.MathUtils.damp(g.scale.y, targetScale, 8, delta);
     g.scale.z = THREE.MathUtils.damp(g.scale.z, targetScale, 8, delta);
@@ -42,8 +65,16 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
     const h = haloRef.current;
     if (h) {
       const mat = h.material as THREE.MeshBasicMaterial;
-      const target = isHovered ? 0.3 : isSelected ? 0.18 : 0.07;
+      const base = isHovered ? 0.3 : isSelected ? 0.18 : 0.07;
+      const target = (isDimmed ? base * DIM_RATIO : base) * introT;
       mat.opacity = THREE.MathUtils.damp(mat.opacity, target, 6, delta);
+    }
+
+    // Label opacity is driven directly through the DOM ref so the intro
+    // fade can multiply against the focus-derived opacity without forcing
+    // a React re-render every frame.
+    if (labelRef.current) {
+      labelRef.current.style.opacity = String(labelOpacity * introT);
     }
   });
 
@@ -80,20 +111,37 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
 
       {children}
 
+      {/* DimLayer must follow {children} so its useFrame registers AFTER any
+          station-internal animations — that's what lets us override emissive
+          cleanly during dim without fighting blinks/pulses. */}
+      <DimLayer groupRef={groupRef} isDimmed={isDimmed} stationId={station.id} />
+
       <Html
-        position={[0, labelOffsetY, 0]}
+        position={[0, labelWorldY, 0]}
         center
-        distanceFactor={10}
         zIndexRange={[20, 0]}
         style={{ pointerEvents: 'none' }}
       >
         <div
-          className="whitespace-nowrap font-mono uppercase text-ink-dim transition-opacity duration-200"
+          ref={(el) => {
+            labelRef.current = el;
+            registerLabel(station.id, el);
+          }}
+          className="whitespace-nowrap font-mono uppercase text-ink"
           style={{
-            fontSize: '11px',
-            letterSpacing: '0.18em',
-            opacity: labelOpacity,
-            textShadow: '0 1px 14px rgba(2,3,10,0.85)',
+            fontSize: '12px',
+            fontWeight: 500,
+            letterSpacing: '0.2em',
+            opacity: 0,
+            padding: '5px 11px',
+            borderRadius: 999,
+            background: 'rgba(13, 20, 36, 0.62)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            backdropFilter: 'blur(5px) saturate(125%)',
+            WebkitBackdropFilter: 'blur(5px) saturate(125%)',
+            textShadow: '0 1px 10px rgba(2,3,10,0.9)',
+            transform: `translate(${initDx}px, ${initDy}px)`,
+            transition: 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           {station.name}
@@ -101,4 +149,68 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
       </Html>
     </group>
   );
+}
+
+/**
+ * Captures each material's initial emissiveIntensity once at mount, then
+ * scales it down only while the parent station is dimmed. While not dimming,
+ * this layer is a no-op so per-station emissive animations (LED blinks,
+ * core pulses) run unaffected.
+ */
+function DimLayer({
+  groupRef,
+  isDimmed,
+  stationId,
+}: {
+  groupRef: React.RefObject<THREE.Group>;
+  isDimmed: boolean;
+  stationId: string;
+}) {
+  const dimRef = useRef(1);
+
+  useEffect(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    g.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!('material' in mesh) || !mesh.material) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const mat of mats) {
+        const m = mat as THREE.MeshStandardMaterial;
+        if (m.emissiveIntensity === undefined) continue;
+        if (m.userData._baseEmissive === undefined) {
+          m.userData._baseEmissive = m.emissiveIntensity;
+        }
+      }
+    });
+  }, [groupRef]);
+
+  useFrame((_, delta) => {
+    dimRef.current = THREE.MathUtils.damp(
+      dimRef.current,
+      isDimmed ? DIM_RATIO : 1.0,
+      7,
+      delta,
+    );
+    const dim = dimRef.current;
+    const introT = stationIntroT(stationId);
+    const effective = dim * introT;
+    // No-op when essentially full — let station animations run freely.
+    if (effective > 0.985) return;
+    const g = groupRef.current;
+    if (!g) return;
+    g.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!('material' in mesh) || !mesh.material) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const mat of mats) {
+        const m = mat as THREE.MeshStandardMaterial;
+        const base = m.userData._baseEmissive;
+        if (base === undefined) continue;
+        m.emissiveIntensity = base * effective;
+      }
+    });
+  });
+
+  return null;
 }

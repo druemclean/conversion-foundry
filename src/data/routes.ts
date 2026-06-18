@@ -197,6 +197,31 @@ export const ROUTES: RouteDatum[] = [
   },
 ];
 
+export type Connections = {
+  stations: Set<string>;
+  routes: Set<string>;
+};
+
+/**
+ * All stations + route ids directly connected to `stationId`. Used by the
+ * attentional-dimming system to keep a focused station's neighbourhood at
+ * 100% while everything else recedes.
+ */
+export function getConnections(stationId: string): Connections {
+  const stations = new Set<string>();
+  const routes = new Set<string>();
+  for (const r of ROUTES) {
+    if (r.from === stationId) {
+      stations.add(r.to);
+      routes.add(r.id);
+    } else if (r.to === stationId) {
+      stations.add(r.from);
+      routes.add(r.id);
+    }
+  }
+  return { stations, routes };
+}
+
 /**
  * Connection point per station — where routes exit/enter visually.
  * Local Y offset above the station's base position.

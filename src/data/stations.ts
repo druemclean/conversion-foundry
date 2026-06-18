@@ -1,5 +1,10 @@
 export type StationCategory = 'origin' | 'connector' | 'hybrid' | 'observatory';
 
+/** Compass direction the screen-space label pill sits relative to the station.
+ *  'S' is a special static-only anchor that also mirrors the world-Y so the pill
+ *  projects below the geometry — used for high-Y stations like Attribution. */
+export type LabelAnchor = 'N' | 'NE' | 'NW' | 'E' | 'W' | 'SE' | 'SW' | 'S';
+
 export type StationDatum = {
   id: string;
   name: string;
@@ -14,6 +19,8 @@ export type StationDatum = {
   takeaway: string;
   /** Renders the station with reduced emissives + transparent shell. Used for sGTM. */
   alternative?: boolean;
+  /** Screen-space anchor for the label pill. Default N (straight above). */
+  labelAnchor?: LabelAnchor;
 };
 
 export const COLORS = {
@@ -255,6 +262,10 @@ export const STATIONS: StationDatum[] = [
     categoryLabel: CATEGORY_LABEL.observatory,
     position: [2, 8, -3],
     scale: 1.0,
+    // Sits at the summit (y=8) — N anchor would float the pill far above
+    // everything. S mirrors the world Y so the pill projects below the
+    // icosahedron, closer to the rest of the scene's mass.
+    labelAnchor: 'S',
     fn: 'The lens applied to all this data. Decides which touchpoint gets credit for a conversion when a user interacts with multiple channels.',
     flow: [
       ['last click', 'simple, default'],

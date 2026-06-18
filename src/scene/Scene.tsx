@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import Lights from './Lights';
 import Ground from './Ground';
 import Starfield from './Starfield';
+import Dust from './Dust';
 import Effects from './Effects';
 import CameraRig from './CameraRig';
 import Backdrop from './Backdrop';
@@ -21,6 +22,7 @@ import Zapier from './stations/Zapier';
 import FileUpload from './stations/FileUpload';
 import Attribution from './stations/Attribution';
 import RouteSystem from './routes/RouteSystem';
+import AnchorController from './AnchorController';
 import { useSelection } from '../state/selection';
 
 function cameraPos(): [number, number, number] {
@@ -64,6 +66,7 @@ export default function Scene() {
         <Lights />
         <Ground />
         <Starfield />
+        <Dust />
 
         {/* Origin */}
         <Website />
@@ -86,6 +89,7 @@ export default function Scene() {
         <Attribution />
 
         <RouteSystem />
+        <AnchorController />
 
         <Effects />
         <OrbitControls

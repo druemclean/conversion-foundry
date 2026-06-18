@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { TOUR_STOPS } from '../data/tour';
+import { ROUTES, getConnections } from '../data/routes';
 
 export type CursorPos = { x: number; y: number };
 
@@ -122,4 +123,65 @@ export function useSelection() {
   const ctx = useContext(SelectionCtx);
   if (!ctx) throw new Error('SelectionProvider missing');
   return ctx;
+}
+
+export type Focus = {
+  /** True when any station/route is focused (hover, selection, or route hover). */
+  active: boolean;
+  /** Stations that should render at full intensity. */
+  stations: Set<string>;
+  /** Routes that should render at full intensity. */
+  routes: Set<string>;
+  /** Whether `id` should be dimmed. */
+  isStationDimmed: (id: string) => boolean;
+  /** Whether route `id` should be dimmed. */
+  isRouteDimmed: (id: string) => boolean;
+};
+
+const EMPTY_FOCUS: Focus = {
+  active: false,
+  stations: new Set(),
+  routes: new Set(),
+  isStationDimmed: () => false,
+  isRouteDimmed: () => false,
+};
+
+/**
+ * Derived view of selection/hover state for the attentional-dimming system.
+ * Hover takes precedence over selection so cursor activity always wins. Route
+ * hover focuses both endpoints + the route itself.
+ */
+export function useFocus(): Focus {
+  const { state } = useSelection();
+  return useMemo(() => {
+    const { hoveredId, hoveredRouteId, selectedId } = state;
+
+    if (hoveredId) {
+      const conn = getConnections(hoveredId);
+      conn.stations.add(hoveredId);
+      return makeFocus(conn.stations, conn.routes);
+    }
+    if (hoveredRouteId) {
+      const route = ROUTES.find((r) => r.id === hoveredRouteId);
+      if (route) {
+        return makeFocus(new Set([route.from, route.to]), new Set([route.id]));
+      }
+    }
+    if (selectedId) {
+      const conn = getConnections(selectedId);
+      conn.stations.add(selectedId);
+      return makeFocus(conn.stations, conn.routes);
+    }
+    return EMPTY_FOCUS;
+  }, [state]);
+}
+
+function makeFocus(stations: Set<string>, routes: Set<string>): Focus {
+  return {
+    active: true,
+    stations,
+    routes,
+    isStationDimmed: (id) => !stations.has(id),
+    isRouteDimmed: (id) => !routes.has(id),
+  };
 }

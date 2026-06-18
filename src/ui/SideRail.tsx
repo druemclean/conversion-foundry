@@ -2,19 +2,27 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSelection } from '../state/selection';
 import { TOUR_STOPS, TOUR_AUTO_ADVANCE_MS } from '../data/tour';
-import { getStation } from '../data/stations';
+import { STATIONS, getStation } from '../data/stations';
+
+/** Stations in render order: tour path first (the eight stops, in tour order),
+ *  then the four off-path stations. The order is also the visual order in
+ *  the rail. */
+const RAIL_ORDER = (() => {
+  const tourIds = TOUR_STOPS.map((s) => s.id);
+  const rest = STATIONS.map((s) => s.id).filter((id) => !tourIds.includes(id));
+  return [...tourIds, ...rest];
+})();
+
+const TOUR_INDEX_BY_ID = new Map(TOUR_STOPS.map((s, i) => [s.id, i]));
 
 export default function SideRail() {
-  const { state, tourStart, tourStop, tourGoto } = useSelection();
+  const { state, select, tourStart, tourStop, tourGoto } = useSelection();
   const { tour } = state;
 
   // Auto-advance: every TOUR_AUTO_ADVANCE_MS, step forward; stop when last.
   useEffect(() => {
     if (!tour.active) return;
-    if (tour.index >= TOUR_STOPS.length - 1) {
-      // Last stop: hold here, don't auto-stop, so the user can read.
-      return;
-    }
+    if (tour.index >= TOUR_STOPS.length - 1) return;
     const timer = setTimeout(() => {
       tourGoto(tour.index + 1);
     }, TOUR_AUTO_ADVANCE_MS);
@@ -38,6 +46,15 @@ export default function SideRail() {
   }, [tour.active, tour.index, tourGoto]);
 
   const currentStop = tour.active ? TOUR_STOPS[tour.index] : null;
+
+  function onClick(id: string) {
+    const tourIdx = TOUR_INDEX_BY_ID.get(id);
+    if (tour.active && tourIdx !== undefined) {
+      tourGoto(tourIdx);
+    } else {
+      select(id);
+    }
+  }
 
   return (
     <aside
@@ -130,40 +147,72 @@ export default function SideRail() {
           )}
         </AnimatePresence>
 
-        {/* Stops list */}
-        <ol className="mt-5 space-y-1">
-          {TOUR_STOPS.map((stop, i) => {
-            const station = getStation(stop.id);
-            const isCurrent = tour.active && i === tour.index;
-            const isVisited = tour.active && i < tour.index;
+        {/* Section label */}
+        <div
+          className="mt-5 mb-2 font-mono uppercase text-ink-dim"
+          style={{ fontSize: '9px', letterSpacing: '0.24em', opacity: 0.6 }}
+        >
+          The path · {TOUR_STOPS.length} stops
+        </div>
+
+        {/* Stations list — tour stops first, then off-path stations */}
+        <ol className="space-y-[3px]">
+          {RAIL_ORDER.map((id) => {
+            const station = getStation(id);
+            if (!station) return null;
+            const tourIdx = TOUR_INDEX_BY_ID.get(id);
+            const isTour = tourIdx !== undefined;
+            const isCurrent = tour.active && tourIdx !== undefined && tourIdx === tour.index;
+            const isVisited = tour.active && tourIdx !== undefined && tourIdx < tour.index;
+            const isSelected = state.selectedId === id;
+            const isFirstNonTour = id === RAIL_ORDER[TOUR_STOPS.length];
             return (
-              <li key={stop.id}>
+              <li key={id}>
+                {isFirstNonTour && (
+                  <div
+                    className="mt-3 mb-2 font-mono uppercase text-ink-dim"
+                    style={{ fontSize: '9px', letterSpacing: '0.24em', opacity: 0.45 }}
+                  >
+                    Off-path
+                  </div>
+                )}
                 <button
-                  onClick={() => tourGoto(i)}
-                  className="flex w-full items-center gap-3 rounded-sm py-1.5 pl-1 pr-2 text-left transition hover:bg-white/[0.04]"
+                  onClick={() => onClick(id)}
+                  className="flex w-full items-center gap-3 rounded-sm py-[5px] pl-1 pr-2 text-left transition hover:bg-white/[0.04]"
                 >
-                  {/* Stop dot */}
+                  {/* Marker dot */}
                   <span
-                    className="grid h-3 w-3 shrink-0 place-items-center rounded-full"
+                    className="grid shrink-0 place-items-center rounded-full"
                     style={{
+                      width: isTour ? 10 : 6,
+                      height: isTour ? 10 : 6,
                       background: isCurrent
-                        ? station?.accent ?? '#fff'
-                        : isVisited
-                          ? 'rgba(255,255,255,0.45)'
+                        ? station.accent
+                        : isTour && (isVisited || !tour.active)
+                          ? station.accent
                           : 'transparent',
-                      boxShadow: isCurrent ? `0 0 10px ${station?.accent}` : undefined,
-                      border: '1px solid rgba(255,255,255,0.18)',
+                      boxShadow: isCurrent ? `0 0 10px ${station.accent}` : undefined,
+                      border: isTour
+                        ? `1px solid ${isCurrent || (!tour.active) ? station.accent : 'rgba(255,255,255,0.22)'}`
+                        : '1px solid rgba(255,255,255,0.18)',
+                      opacity: isTour ? (isCurrent ? 1 : isVisited || !tour.active ? 0.95 : 0.55) : 0.5,
+                      marginLeft: isTour ? 0 : 2,
                     }}
                   />
                   <span
-                    className="font-mono uppercase transition"
+                    className="font-mono uppercase transition truncate"
                     style={{
-                      fontSize: '11px',
+                      fontSize: isTour ? '11px' : '10px',
                       letterSpacing: '0.14em',
-                      color: isCurrent ? '#fff' : isVisited ? 'var(--ink-dim)' : 'rgba(168, 179, 200, 0.55)',
+                      color: isCurrent || isSelected
+                        ? '#fff'
+                        : isTour
+                          ? 'var(--ink-dim)'
+                          : 'rgba(168, 179, 200, 0.5)',
+                      fontWeight: isCurrent ? 500 : 400,
                     }}
                   >
-                    {station?.name}
+                    {station.name}
                   </span>
                 </button>
               </li>

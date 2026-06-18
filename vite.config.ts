@@ -9,4 +9,8 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1500,
   },
+  server: {
+    host: true,
+    port: 5174,
+  }
 });

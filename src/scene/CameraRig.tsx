@@ -4,6 +4,7 @@ import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSelection } from '../state/selection';
 import { getStation } from '../data/stations';
+import { intro, INTRO_DURATION_S } from '../state/intro';
 
 type OrbitLike = {
   target: THREE.Vector3;
@@ -43,6 +44,7 @@ export default function CameraRig() {
   // Intro fly-through only runs once after the first time loading finishes.
   const introDone = useRef(false);
   const introPlaying = useRef(false);
+  const introElapsed = useRef(0);
 
   useEffect(() => {
     if (loading || introDone.current || introPlaying.current) return;
@@ -50,6 +52,8 @@ export default function CameraRig() {
     // they want to be at the destination, not watch a fly-through first.
     if (state.selectedId) {
       introDone.current = true;
+      intro.t = 1;
+      intro.active = false;
       return;
     }
     camera.position.copy(INTRO_POS);
@@ -81,26 +85,33 @@ export default function CameraRig() {
   }, [state.selectedId, controls]);
 
   useFrame((_, delta) => {
-    // Slower easing during the intro so it reads as a deliberate cinematic
-    // arrival rather than a snap.
-    const settleBase = introPlaying.current ? 0.04 : 0.0009;
-    const t = 1 - Math.pow(settleBase, delta);
-
-    // Intro: lerp the camera until it's within 0.3u of the default, then
-    // hand control back to the standard rig.
+    // Intro: time-based progression with an eased curve so the scene wakes
+    // up rather than just snapping in. Drives intro.t which stations,
+    // routes, and capsules read for their staggered reveals.
     if (introPlaying.current) {
-      camera.position.lerp(DEFAULT_POS, t);
-      if (camera.position.distanceTo(DEFAULT_POS) < 0.3) {
+      introElapsed.current += delta;
+      const raw = Math.min(1, introElapsed.current / INTRO_DURATION_S);
+      intro.t = easeOutCubic(raw);
+
+      // Camera position: parametric lerp along the same eased curve.
+      camera.position.lerpVectors(INTRO_POS, DEFAULT_POS, intro.t);
+
+      if (raw >= 1) {
         introPlaying.current = false;
         introDone.current = true;
+        intro.t = 1;
+        intro.active = false;
+        camera.position.copy(DEFAULT_POS);
       }
     } else if (state.selectedId) {
+      const t = 1 - Math.pow(0.0009, delta);
       if (camera.position.distanceTo(targetPos.current) > 0.05) {
         camera.position.lerp(targetPos.current, t);
       }
     }
 
     if (controls) {
+      const t = 1 - Math.pow(introPlaying.current ? 0.04 : 0.0009, delta);
       if (controls.target.distanceTo(targetLook.current) > 0.05) {
         controls.target.lerp(targetLook.current, t);
       }
@@ -109,4 +120,8 @@ export default function CameraRig() {
   });
 
   return null;
+}
+
+function easeOutCubic(x: number) {
+  return 1 - Math.pow(1 - x, 3);
 }

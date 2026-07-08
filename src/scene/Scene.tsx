@@ -26,7 +26,7 @@ import AnchorController from './AnchorController';
 import { useSelection } from '../state/selection';
 
 function cameraPos(): [number, number, number] {
-  const DEFAULT: [number, number, number] = [16, 11, 18];
+  const DEFAULT: [number, number, number] = [21, 14, 24];
   if (typeof window === 'undefined') return DEFAULT;
   const cam = new URLSearchParams(window.location.search).get('cam');
   if (!cam) return DEFAULT;
@@ -62,7 +62,13 @@ export default function Scene() {
     >
       <Suspense fallback={null}>
         <Backdrop />
-        <Environment preset="warehouse" environmentIntensity={0.55} />
+        {/* Local HDRI (was preset="warehouse") — the preset fetches from
+            raw.githubusercontent.com at runtime, which is slow or hangs on
+            cold visits and left the scene black behind the loader. */}
+        <Environment
+          files={`${import.meta.env.BASE_URL}hdri/empty_warehouse_01_1k.hdr`}
+          environmentIntensity={0.55}
+        />
         <Lights />
         <Ground />
         <Starfield />

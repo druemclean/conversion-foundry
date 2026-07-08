@@ -13,7 +13,7 @@ type RouteTubeProps = {
 
 const CURVE_SEGMENTS = 96;
 const TUBE_SEGMENTS = 8;
-const DIM_RATIO = 0.22;
+const DIM_RATIO = 0.12;
 
 export default function RouteTube({ route, curve }: RouteTubeProps) {
   const { state, hoverRoute } = useSelection();

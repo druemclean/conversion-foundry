@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
-import { STATIONS } from '../data/stations';
+import { STATIONS, COLORS } from '../data/stations';
 import { ROUTES } from '../data/routes';
+import { useSelection } from '../state/selection';
 
 const SCENE_COUNTS = `${STATIONS.length} stations · ${ROUTES.length} routes`;
 
+/** Color key for the scene's accent language, in plain marketing terms. */
+const LEGEND: Array<[string, string]> = [
+  [COLORS.cyan, 'Google / browser'],
+  [COLORS.magenta, 'Meta'],
+  [COLORS.green, 'Offline / CRM'],
+  [COLORS.amber, 'Consent'],
+];
+
 export default function Hud() {
+  const { state } = useSelection();
   const [hintVisible, setHintVisible] = useState(true);
 
   // Controls hint fades out after the user has been actively moving the
@@ -37,42 +47,40 @@ export default function Hud() {
     };
   }, []);
 
+  // While the welcome prompt is up, the prompt is the only voice on screen.
+  const chromeVisible = state.welcomeDismissed;
+
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between">
+    <div className="pointer-events-none absolute inset-0 z-[25] flex flex-col justify-between">
       <header className="flex items-start justify-between p-8">
-        <div className="hud-plate hud-title-plate max-w-[480px]">
-          {/* OPGO wordmark — separate, more designed than the eyebrow */}
-          <div className="flex items-center gap-2.5">
-            <span
-              className="block h-1.5 w-1.5 rounded-full"
-              style={{ background: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)' }}
-            />
-            <span
-              className="font-serif text-ink"
-              style={{ fontSize: '20px', letterSpacing: '0.06em', lineHeight: 1 }}
-            >
-              OPGO
-            </span>
-          </div>
-          <div
-            className="mt-3 font-mono uppercase text-ink-dim"
-            style={{ fontSize: '10px', letterSpacing: '0.24em', opacity: 0.7 }}
+        {/* Compact wordmark — the full title lives in the start prompt now,
+            so the resting chrome stays out of the scene's way. */}
+        <div
+          className="hud-plate hud-title-plate flex items-center gap-3"
+          style={{ padding: '12px 18px' }}
+        >
+          <span
+            className="block h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)' }}
+          />
+          <span
+            className="font-serif text-ink"
+            style={{ fontSize: '17px', letterSpacing: '0.05em', lineHeight: 1 }}
           >
-            Internal training
-          </div>
-          <h1
-            className="mt-2 font-serif text-ink"
-            style={{ fontSize: '44px', lineHeight: 1.05, letterSpacing: '-0.01em' }}
+            OPGO
+          </span>
+          <span
+            className="block h-3 w-px shrink-0"
+            style={{ background: 'rgba(255,255,255,0.14)' }}
+          />
+          <span
+            className="font-mono uppercase text-ink-dim"
+            style={{ fontSize: '10px', letterSpacing: '0.2em' }}
           >
             Conversion Tracking Foundry
-          </h1>
-          <p className="mt-2 text-[14px] text-ink-dim">
-            A 3D explainer of how a click becomes a measured conversion — and the
-            machinery that carries it across browsers, servers, and ad platforms.
-          </p>
+          </span>
         </div>
 
-        {/* Scene counts — replaces the previous v0.1 dev metadata plate */}
         <div
           className="hud-plate hud-meta-plate hidden font-mono uppercase text-ink-dim md:block"
           style={{ fontSize: '10px', letterSpacing: '0.22em', padding: '12px 16px' }}
@@ -87,15 +95,38 @@ export default function Hud() {
           style={{
             fontSize: '11px',
             letterSpacing: '0.18em',
-            opacity: hintVisible ? 1 : 0,
-            transform: hintVisible ? 'translateY(0)' : 'translateY(6px)',
+            opacity: chromeVisible && hintVisible ? 1 : 0,
+            transform: chromeVisible && hintVisible ? 'translateY(0)' : 'translateY(6px)',
             transition: 'opacity 380ms ease-out, transform 380ms ease-out',
           }}
         >
           drag to orbit · click a station · esc to close · ▶ guided
         </div>
-        {/* Bottom-right deliberately left empty — was dev-step metadata. */}
-        <div />
+
+        {/* Color legend — the scene's accent language, decoded. */}
+        <div
+          className="hud-plate hud-legend-plate flex items-center gap-4"
+          style={{
+            padding: '10px 16px',
+            opacity: chromeVisible ? 1 : 0,
+            transition: 'opacity 380ms ease-out',
+          }}
+        >
+          {LEGEND.map(([color, label]) => (
+            <span key={label} className="flex items-center gap-2">
+              <span
+                className="block h-1.5 w-1.5 rounded-full"
+                style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+              />
+              <span
+                className="font-mono uppercase text-ink-dim"
+                style={{ fontSize: '10px', letterSpacing: '0.14em' }}
+              >
+                {label}
+              </span>
+            </span>
+          ))}
+        </div>
       </footer>
     </div>
   );

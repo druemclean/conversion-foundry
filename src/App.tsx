@@ -5,6 +5,7 @@ import InfoPanel from './ui/InfoPanel';
 import Tooltip from './ui/Tooltip';
 import SideRail from './ui/SideRail';
 import Loader from './ui/Loader';
+import StartPrompt from './ui/StartPrompt';
 import { SelectionProvider, useSelection } from './state/selection';
 
 function AppInner() {
@@ -43,6 +44,7 @@ function AppInner() {
       <SideRail />
       <InfoPanel />
       <Tooltip />
+      <StartPrompt />
       <Loader />
     </div>
   );

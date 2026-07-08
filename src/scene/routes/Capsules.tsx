@@ -10,7 +10,7 @@ const BASE_SPEED = 0.06;
 const HERO_SPEED_MUL = 0.7;
 const HOVER_SPEED_MUL = 0.3; // per the brief: 30% speed when route is hovered
 const HERO_LABEL_MS = 2400;
-const DIM_RATIO = 0.22;
+const DIM_RATIO = 0.12;
 
 type CapsulesProps = {
   route: RouteDatum;

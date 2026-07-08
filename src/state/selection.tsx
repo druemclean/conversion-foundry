@@ -23,6 +23,9 @@ type State = {
   hoveredRouteId: string | null;
   cursor: CursorPos | null;
   tour: TourState;
+  /** False until the first-run welcome prompt is answered. Deep links
+   *  (?station, ?tour) pre-dismiss it — those visitors chose a destination. */
+  welcomeDismissed: boolean;
 };
 
 type Action =
@@ -32,7 +35,14 @@ type Action =
   | { type: 'cursor'; pos: CursorPos | null }
   | { type: 'tourStart' }
   | { type: 'tourStop' }
-  | { type: 'tourGoto'; index: number };
+  | { type: 'tourGoto'; index: number }
+  | { type: 'dismissWelcome' };
+
+function isDeepLink(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.has('station') || params.has('tour');
+}
 
 const initial: State = {
   selectedId: null,
@@ -40,6 +50,7 @@ const initial: State = {
   hoveredRouteId: null,
   cursor: null,
   tour: { active: false, index: 0 },
+  welcomeDismissed: isDeepLink(),
 };
 
 function reducer(state: State, action: Action): State {
@@ -63,6 +74,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         tour: { active: true, index: 0 },
         selectedId: TOUR_STOPS[0]?.id ?? null,
+        welcomeDismissed: true,
       };
     case 'tourStop':
       return { ...state, tour: { ...state.tour, active: false } };
@@ -75,6 +87,8 @@ function reducer(state: State, action: Action): State {
         selectedId: stop?.id ?? state.selectedId,
       };
     }
+    case 'dismissWelcome':
+      return { ...state, welcomeDismissed: true };
   }
 }
 
@@ -87,6 +101,7 @@ type Ctx = {
   tourStart: () => void;
   tourStop: () => void;
   tourGoto: (index: number) => void;
+  dismissWelcome: () => void;
 };
 
 const SelectionCtx = createContext<Ctx | null>(null);
@@ -110,10 +125,11 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     (index: number) => dispatch({ type: 'tourGoto', index }),
     [],
   );
+  const dismissWelcome = useCallback(() => dispatch({ type: 'dismissWelcome' }), []);
 
   const value = useMemo(
-    () => ({ state, select, hover, hoverRoute, setCursor, tourStart, tourStop, tourGoto }),
-    [state, select, hover, hoverRoute, setCursor, tourStart, tourStop, tourGoto],
+    () => ({ state, select, hover, hoverRoute, setCursor, tourStart, tourStop, tourGoto, dismissWelcome }),
+    [state, select, hover, hoverRoute, setCursor, tourStart, tourStop, tourGoto, dismissWelcome],
   );
 
   return <SelectionCtx.Provider value={value}>{children}</SelectionCtx.Provider>;

@@ -15,7 +15,11 @@ type Props = {
   children: ReactNode;
 };
 
-const DIM_RATIO = 0.22;
+const DIM_RATIO = 0.12;
+
+/** The three stations a first-time viewer should anchor on. Only these carry
+ *  labels in the idle scene; everything else labels on hover/focus. */
+const ANCHOR_LABEL_IDS = new Set(['website', 'gtm', 'gads']);
 
 // Reticle cursor — a tighter, more deliberate hover affordance than the
 // browser pointer. Hotspot at (12, 12) centers the cross on the click point.
@@ -34,8 +38,18 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
   const isFocusedOne = isHovered || isSelected;
   const isDimmed = focus.active && focus.isStationDimmed(station.id);
 
-  // Station label opacity: focused full, dimmed faded, ambient mid.
-  const labelOpacity = isFocusedOne ? 1.0 : isDimmed ? 0.18 : focus.active ? 0.65 : 0.55;
+  // Station label opacity: focused full, connected neighbors mid, dimmed
+  // hidden. Idle scene labels only the three anchor stations — twelve
+  // simultaneous labels was most of the perceived clutter.
+  const labelOpacity = isFocusedOne
+    ? 1.0
+    : focus.active
+      ? isDimmed
+        ? 0
+        : 0.65
+      : ANCHOR_LABEL_IDS.has(station.id)
+        ? 0.55
+        : 0;
 
   // Initial CSS offset before AnchorController takes over on first frame.
   // Static S anchor also mirrors the world Y so the label sits below the
@@ -116,10 +130,12 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
           cleanly during dim without fighting blinks/pulses. */}
       <DimLayer groupRef={groupRef} isDimmed={isDimmed} stationId={station.id} />
 
+      {/* zIndexRange caps below the HUD chrome (z-25) so labels can never
+          bleed through plates or panels. */}
       <Html
         position={[0, labelWorldY, 0]}
         center
-        zIndexRange={[20, 0]}
+        zIndexRange={[9, 0]}
         style={{ pointerEvents: 'none' }}
       >
         <div
@@ -141,7 +157,8 @@ export default function StationFrame({ station, labelOffsetY, haloRadius, childr
             WebkitBackdropFilter: 'blur(5px) saturate(125%)',
             textShadow: '0 1px 10px rgba(2,3,10,0.9)',
             transform: `translate(${initDx}px, ${initDy}px)`,
-            transition: 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transition:
+              'transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease-out',
           }}
         >
           {station.name}

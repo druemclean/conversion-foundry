@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useProgress } from '@react-three/drei';
 import * as THREE from 'three';
@@ -14,9 +14,11 @@ type OrbitLike = {
   removeEventListener: (e: string, h: () => void) => void;
 };
 
-const DEFAULT_POS = new THREE.Vector3(16, 11, 18);
+// Resting frame reads the whole system as one shape — Website left, GTM
+// center, ad platforms right — rather than opening inside the GTM cluster.
+const DEFAULT_POS = new THREE.Vector3(21, 14, 24);
 const DEFAULT_TARGET = new THREE.Vector3(0, 2.2, 0);
-const INTRO_POS = new THREE.Vector3(38, 26, 44);
+const INTRO_POS = new THREE.Vector3(44, 30, 50);
 
 function offsetForStation(pos: [number, number, number]): THREE.Vector3 {
   const v = new THREE.Vector3(...pos);
@@ -46,8 +48,17 @@ export default function CameraRig() {
   const introPlaying = useRef(false);
   const introElapsed = useRef(0);
 
+  // Safety net: if asset loading hangs (e.g. a stalled fetch), start the
+  // intro anyway after a grace period so the scene never sits invisible —
+  // every station/route fade is gated on intro.t. Mirrors Loader's force-hide.
+  const [forceIntro, setForceIntro] = useState(false);
   useEffect(() => {
-    if (loading || introDone.current || introPlaying.current) return;
+    const t = setTimeout(() => setForceIntro(true), 7000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if ((loading && !forceIntro) || introDone.current || introPlaying.current) return;
     // Skip the intro when the user landed on a deep link (?station, ?tour) —
     // they want to be at the destination, not watch a fly-through first.
     if (state.selectedId) {
@@ -58,7 +69,7 @@ export default function CameraRig() {
     }
     camera.position.copy(INTRO_POS);
     introPlaying.current = true;
-  }, [loading, camera, state.selectedId]);
+  }, [loading, forceIntro, camera, state.selectedId]);
 
   useEffect(() => {
     if (!controls) return;

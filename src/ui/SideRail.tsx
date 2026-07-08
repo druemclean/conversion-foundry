@@ -47,6 +47,10 @@ export default function SideRail() {
 
   const currentStop = tour.active ? TOUR_STOPS[tour.index] : null;
 
+  // The rail joins the chrome only after the welcome prompt is answered —
+  // before that, the prompt is the sole call to action.
+  if (!state.welcomeDismissed) return null;
+
   function onClick(id: string) {
     const tourIdx = TOUR_INDEX_BY_ID.get(id);
     if (tour.active && tourIdx !== undefined) {
@@ -58,8 +62,8 @@ export default function SideRail() {
 
   return (
     <aside
-      className="side-rail pointer-events-auto absolute left-8 z-20 w-[280px]"
-      style={{ top: 220 }}
+      className="side-rail pointer-events-auto absolute left-8 z-[26] w-[280px]"
+      style={{ top: 104 }}
     >
       <div className="hud-plate" style={{ padding: 18 }}>
         {/* Header — toggles between "Follow an event" CTA and tour controls */}

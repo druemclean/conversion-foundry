@@ -42,4 +42,3 @@ export const TOUR_STOPS: TourStop[] = [
   },
 ];
 
-export const TOUR_AUTO_ADVANCE_MS = 5200;

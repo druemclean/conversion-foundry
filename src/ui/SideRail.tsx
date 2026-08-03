@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSelection } from '../state/selection';
-import { TOUR_STOPS, TOUR_AUTO_ADVANCE_MS } from '../data/tour';
+import { TOUR_STOPS } from '../data/tour';
 import { STATIONS, getStation } from '../data/stations';
 
 /** Stations in render order: tour path first (the eight stops, in tour order),
@@ -19,15 +19,8 @@ export default function SideRail() {
   const { state, select, tourStart, tourStop, tourGoto } = useSelection();
   const { tour } = state;
 
-  // Auto-advance: every TOUR_AUTO_ADVANCE_MS, step forward; stop when last.
-  useEffect(() => {
-    if (!tour.active) return;
-    if (tour.index >= TOUR_STOPS.length - 1) return;
-    const timer = setTimeout(() => {
-      tourGoto(tour.index + 1);
-    }, TOUR_AUTO_ADVANCE_MS);
-    return () => clearTimeout(timer);
-  }, [tour.active, tour.index, tourGoto]);
+  // The tour advances only when the viewer asks it to — Next button, arrow
+  // keys, or clicking a stop in the list. No auto-advance: readers set the pace.
 
   // Keyboard nav while tour is active: arrow keys to step.
   useEffect(() => {
@@ -128,24 +121,45 @@ export default function SideRail() {
                   Exit
                 </button>
               </div>
-              {/* Prev / Next */}
+              {/* Prev / Next — self-paced, so Next is the hero control */}
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => tourGoto(tour.index - 1)}
                   disabled={tour.index === 0}
                   aria-label="Previous step"
-                  className="flex-1 rounded-md border border-white/10 px-2 py-1.5 transition hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="grid place-items-center rounded-md border border-white/10 px-3 py-1.5 transition hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ArrowGlyph dir="left" />
                 </button>
-                <button
-                  onClick={() => tourGoto(tour.index + 1)}
-                  disabled={tour.index === TOUR_STOPS.length - 1}
-                  aria-label="Next step"
-                  className="flex-1 rounded-md border border-white/10 px-2 py-1.5 transition hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ArrowGlyph dir="right" />
-                </button>
+                {tour.index < TOUR_STOPS.length - 1 ? (
+                  <button
+                    onClick={() => tourGoto(tour.index + 1)}
+                    aria-label="Next step"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 px-2 py-1.5 transition hover:border-white/40"
+                    style={{ background: 'rgba(95, 212, 255, 0.07)' }}
+                  >
+                    <span
+                      className="font-mono uppercase text-ink"
+                      style={{ fontSize: '10px', letterSpacing: '0.18em' }}
+                    >
+                      Next stop
+                    </span>
+                    <ArrowGlyph dir="right" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={tourStop}
+                    aria-label="Finish tour"
+                    className="flex-1 rounded-md border border-white/15 px-2 py-1.5 font-mono uppercase text-ink transition hover:border-white/40"
+                    style={{
+                      fontSize: '10px',
+                      letterSpacing: '0.18em',
+                      background: 'rgba(95, 212, 255, 0.07)',
+                    }}
+                  >
+                    Finish tour
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -267,10 +281,9 @@ function ArrowGlyph({ dir }: { dir: 'left' | 'right' }) {
       fill="none"
       style={{
         transform: dir === 'left' ? 'scaleX(-1)' : undefined,
-        margin: '0 auto',
         display: 'block',
       }}
-      className="text-ink"
+      className="shrink-0 text-ink"
     >
       <path d="M1 5H13M13 5L9 1M13 5L9 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>

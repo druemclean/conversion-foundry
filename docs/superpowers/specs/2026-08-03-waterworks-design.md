@@ -1,6 +1,6 @@
 # Groundwork — The Waterworks
 
-**Status:** design agreed, not built. Name provisional. §10 drawn 2026-08-03; §9.1 still gates all build work.
+**Status:** design agreed, not built. Name provisional. §9.1 (rendering) and §10 both resolved 2026-08-03 — build is unblocked at §11.1.
 **Date:** 2026-08-03
 **Relationship to the Foundry:** second visualization of identical content. Not a replacement.
 
@@ -250,16 +250,42 @@ Entered by hash route (`#/foundry`, `#/waterworks`) with a small switch affordan
 
 ## 9. Open — resolve before building
 
-1. **Rendering approach.** Genuinely undecided and it should be settled first. Ortho-locked R3F with shader water, versus 2D canvas with flow fields. Water is expensive in 3D and the piece is stylized enough that 2D may be both cheaper and better-looking. This decision gates everything else.
+1. ~~**Rendering approach.**~~ **Resolved 2026-08-03 — R3F.** See §9.1 below.
 2. **Pond labeling.** Do the ponds carry concept names (consent, naming, matching) or stay physical and let the info panel name them? Leaning physical.
 3. **Traversal.** Survey view versus working view, and how you move between them. *Partly resolved:* §10.2 establishes the survey view as an overlook you descend from. How you move *within* the working view is still open.
 4. **Rain at low volume.** Drought must visibly change the picture, not just a number.
 5. **How much the learner builds vs. inherits** in mode B. All-bare-hillside may be too much blank page.
 6. **Scenario access** — freely selectable, or sequenced?
 
+### 9.1 Rendering approach — resolved
+
+**R3F, one long-lens perspective camera, instruments as anchored 2D overlays.**
+
+The question as originally posed assumed 3D is expensive and 2D is cheap. Drawing §10 moved three of its premises.
+
+**The pool wall is vertical, and it is the centerpiece.** §10.1's most valuable object — a gauge post reading 40 standing in a pool that plainly does not hold 40 — is a side-on reading, with four marks stacked on one wall. A plan-view 2D canvas cannot show it. An elevation-view 2D canvas shows it well and then cannot show one stream branching to three pools side by side. 2D forces a choice between the network and the pool wall; §10 needs both.
+
+**Everything varies procedurally.** §4 has `ClientSite` reshaping the terrain and mode B has the learner cutting channels at runtime. That is precisely where 3D pays for itself — the camera does projection and the lights do shading for free. In 2D you either hand-draw every variant or write a renderer that draws them, which is a worse 3D engine with extra steps.
+
+**3D is already paid for.** §8 is one Vite app with two views; R3F, drei and postprocessing ship regardless. A 2D engine is not a saving, it is an addition, and it would reduce §8's shared shell to the info panel and tokens.
+
+The "water is expensive" premise is also weaker than it reads. Expensive water means planar reflections, SSR, true refraction and simulated foam — all of which §7 explicitly rejects. Matte ochre-to-clear graded water is a flowmap UV scroll plus a depth-based color ramp.
+
+**Specifics:**
+
+- **One perspective camera at a long focal length** (~22° FOV), not literal ortho. At the §10.2 overlook it reads as near-orthographic and composes two hillsides cleanly; moved in, it becomes standing-at-the-water's-edge perspective, which §10.3 needs. One projection serves both, with no ortho↔perspective transition to fight.
+- **Instruments are DOM/SVG anchored to 3D positions** — gauge faces, noise bands, plaques, retention labels. Reuses the Foundry's screen-space anchoring (`labelRegistry.ts`, `StationDatum.labelAnchor`) and keeps Instrument Serif and JetBrains Mono crisp.
+- **Divergence from the Foundry is a settings problem, not an engine problem.** Fork `Effects.tsx` (52 lines, effectively a settings object) to a daylight variant: bloom near zero — nothing here is emissive, per §7 — SSAO retained, warm tonemap, no chromatic aberration. One warm key sun plus a large sky hemi; high-roughness non-metallic materials throughout. The Foundry is emissive heroes on dark; this is bounced daylight on matte.
+
+**Reuse is thinner than the file names suggest.** `curves.ts` is 29 lines of station-to-station arcs — the pattern transfers (spline swept into geometry) but a ground-hugging meandering channel is not a station arc, so expect to write it fresh. Effects, loader, info panel, tooltip and tokens transfer properly.
+
+**Accepted cost.** Runtime channel authoring in mode B is the hardest single item in the build and would have been materially easier in 2D. Approach: draw in screen space, raycast to the heightfield, carve the terrain, sweep a channel mesh along the resulting spline. Expect this estimate to be the one that is wrong.
+
+**Falsification.** Build step §11.1 — static hillside, one scenario, no interaction — *is* the test for this decision. If it comes out looking like the Foundry with the lights on, the call was wrong and almost nothing is sunk. That is why this is decided rather than spiked both ways.
+
 ## 10. The remaining design pieces
 
-Drawn 2026-08-03. None of the four forks on §9.1 — the 2D/3D decision changes fidelity, not meaning.
+Drawn 2026-08-03. None of the four forks on the rendering choice — it changes fidelity, not meaning.
 
 ### 10.1 Platform pools and the division weir
 
@@ -325,7 +351,7 @@ The three diagnoses of §5.6, each a distinct physical reading:
 
 ## 11. Build order
 
-Nothing starts until §9.1 is answered.
+§9.1 is answered — R3F. Step 1 is also the falsification test for that decision; look hard at it before proceeding to step 2.
 
 1. Static hillside for one scenario at the agreed fidelity. No interaction. Look at it.
 2. Flowing water — rills, channels, ponds, the color grade.

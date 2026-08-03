@@ -7,6 +7,8 @@ import SideRail from './ui/SideRail';
 import Loader from './ui/Loader';
 import StartPrompt from './ui/StartPrompt';
 import { SelectionProvider, useSelection } from './state/selection';
+import { useRoute } from './shared/router';
+import Waterworks from './waterworks/Waterworks';
 
 function AppInner() {
   const { setCursor, select, tourStart, tourGoto } = useSelection();
@@ -51,6 +53,8 @@ function AppInner() {
 }
 
 export default function App() {
+  const view = useRoute();
+  if (view === 'waterworks') return <Waterworks />;
   return (
     <SelectionProvider>
       <AppInner />

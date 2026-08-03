@@ -1,6 +1,6 @@
 # Groundwork — The Waterworks
 
-**Status:** design agreed, not built. Name provisional.
+**Status:** design agreed, not built. Name provisional. §10 drawn 2026-08-03; §9.1 still gates all build work.
 **Date:** 2026-08-03
 **Relationship to the Foundry:** second visualization of identical content. Not a replacement.
 
@@ -56,8 +56,8 @@ Upstream to downstream:
 | 3 | **Feeder rills** | Individual interactions. Raw, muddy, unnamed, nothing sorted. |
 | 4 | **The intake weir** | Capture. What you collect *at all*. First thing built, hardest to move later. |
 | 5 | **The gates** | Consent, filtering, naming, conditions. Where judgment lives. |
-| 6 | **The division weir** | The split to destinations. (A *partidor* — the real acequia stone that parts one stream into fixed shares.) |
-| 7 | **Platform pools** | Side by side, same level. Different chemistry each. |
+| 6 | **The division weir** | The routing to destinations. A level stone lip the stream runs over across its whole width, feeding every destination channel at once. It sorts; it does not share. See §10.1. |
+| 7 | **Platform pools** | Side by side at the same *elevation* — peers, no hierarchy. Water levels differ. Different chemistry each. |
 | 8 | **Draw-off channels** | What you pull from each pool toward the report. |
 | 9 | **The pool** | The deliverable. Fitted out per client. The only part they ever see. |
 
@@ -120,6 +120,7 @@ Everything downstream derives from this: which channels can be cut, which gates 
 | **Ecommerce** | Clean, purchase events, real values | Not easy: consent gaps, Pixel/CAPI dedup, refunds rewriting values after the fact. |
 | **B2B manufacturing** *(most representative)* | Good online data, RFQ forms | Offline tail is a six-month CRM cycle **you don't own**. Your channels are correct and the pool is still low. |
 | **Clinic** | Protected — cannot draw from this catchment | Low volume, and the platform starts modeling on your behalf. |
+| **Franchise** *(data only — never playable)* | Forty locations, one untagged site | Exists solely as the right-hand half of the scenario pair. See §10.2. |
 
 ### The scenario pair
 
@@ -128,6 +129,8 @@ Two scenarios exist specifically to be seen side by side, because together they 
 **Low volume, high architecture.** Immaculate waterworks. Every channel cut true, every gate correct, dye traces clean. And a trickle. Ponds barely wet, the gauge sits in the noise, week-over-week is meaningless. *Architecture does not create water.*
 
 **High volume, low architecture.** A flood down a bare hillside. Enormous flow, almost no channels, water cutting its own gullies and going wherever the ground falls. Most of it lost. Impressive from a distance, which is the trap.
+
+Realized as a non-interactive overlook set-piece — §10.2.
 
 ---
 
@@ -159,6 +162,8 @@ Each platform pool reads differently from identical input. This is the number-on
 - Google's pool is pre-dyed — it can match on click IDs your channel never carried.
 - Each pool has its own **retention depth**, marked on the pool wall.
 
+Crucially the pools receive *identical* input — the division weir feeds every channel the same water (§10.1). Differences in what each pool reports never come from unequal shares. Full pool signatures in §10.1.
+
 ### 5.4 Side channels — retroactive recategorization
 
 Sometimes you never built a gate for something, but the platform has been collecting all along. You lower a new intake into the platform pool and draw from it directly, bypassing every gate you never cut.
@@ -166,6 +171,8 @@ Sometimes you never built a gate for something, but the platform has been collec
 **This must have a visible limit.** Each pool carries a **retention line**. You can draw anything above it. Everything below has been let go and no side channel reaches it. The depth differs per pool, and the asymmetry is the lesson — some things you can rebuild later and some you cannot, and knowing which is the skill.
 
 Do not let this read as "mistakes are always fixable."
+
+**Pools are through-flow, not accumulators.** Water arrives at the top and the oldest water leaves continuously out of the bottom. A pool's level is therefore volume *within the window*, not a lifetime total, and the retention line is the lowest point a new intake can be lowered to — below it the water is already gone. Silt still settles on the floor and stays. The water passes through; the record does not.
 
 ### 5.5 Leaks
 
@@ -245,19 +252,76 @@ Entered by hash route (`#/foundry`, `#/waterworks`) with a small switch affordan
 
 1. **Rendering approach.** Genuinely undecided and it should be settled first. Ortho-locked R3F with shader water, versus 2D canvas with flow fields. Water is expensive in 3D and the piece is stylized enough that 2D may be both cheaper and better-looking. This decision gates everything else.
 2. **Pond labeling.** Do the ponds carry concept names (consent, naming, matching) or stay physical and let the info panel name them? Leaning physical.
-3. **Traversal.** Survey view versus working view, and how you move between them.
+3. **Traversal.** Survey view versus working view, and how you move between them. *Partly resolved:* §10.2 establishes the survey view as an overlook you descend from. How you move *within* the working view is still open.
 4. **Rain at low volume.** Drought must visibly change the picture, not just a number.
 5. **How much the learner builds vs. inherits** in mode B. All-bare-hillside may be too much blank page.
 6. **Scenario access** — freely selectable, or sequenced?
 
-## 10. Remaining design pieces
+## 10. The remaining design pieces
 
-Not yet drawn, in priority order:
+Drawn 2026-08-03. None of the four forks on §9.1 — the 2D/3D decision changes fidelity, not meaning.
 
-1. Platform pools and the division weir
-2. The scenario pair (low-volume/high-architecture beside high-volume/low-architecture)
-3. Pool fit-out variants by `literacy`
-4. The dye run, as a sequence
+### 10.1 Platform pools and the division weir
+
+**The weir sorts; it does not share.** The headworks' last stone is a long, level lip the stream runs over across its whole width. Below it, one channel per destination, and each channel mouth carries a **grate** — bars you set, deciding what that destination receives. `form_submit` passes every grate; `scroll_depth` passes only GA4's.
+
+The same water visibly runs down all three channels at once. This is the one impossible object in an otherwise physical world, and it is deliberate: a learner who notices *"that's the same water three times"* has understood the lesson. A proportional split would teach the opposite — that Ads reports more because it got more — and would fight §5.3 for the rest of the piece.
+
+A grate is a gate whose decision is *destination* rather than *admission*, so §5.1's taxonomy applies unchanged: chosen (you sent it), forced (the platform won't accept that event type), inherited (it routes something you never asked it to).
+
+**Three pools, not four** — Pixel and CAPI are two inlets to one Meta pool. Side by side, no hierarchy. Each carries four marks: water level, staff gauge, retention line, silt.
+
+**Level is what arrived and stayed. The gauge is what the platform reports. The gap between them is the most valuable object in the piece** — a post reading 40 standing in a pool that plainly does not hold 40.
+
+| Pool | Signature | The confusion it answers |
+| --- | --- | --- |
+| **GA4** | Clear, deep, retention line lowest on the wall. One inlet. Gauge sits close to the water. | The honest baseline. Without one pool that mostly tells the truth, nothing else reads as strange. |
+| **Google Ads** | Pre-dyed — already holds color it issued itself. Credits water carrying matching dye, and some that arrives clean. Retention line high. **Gauge reads above the water at low volume.** | Modeled conversions. §5.1's inherited gate, made physical. |
+| **Meta** | Surface inlet (Pixel) plus a second **buried** inlet below the waterline (CAPI), and it catches rain directly on its own surface. Unmarked, both inlets deliver the same water and **the gauge reads near double**. Set `event_id` and it settles. | Deduplication, and view-through credit for water that never came down a channel. |
+
+Standing at the pools: three gauges reading three different numbers, over three pools visibly holding different amounts, all fed from one lip. The 40-vs-31 question is answered before anyone reads a word.
+
+**Legibility risk to watch.** Four marks on one pool wall is the most likely thing to go muddy. They survive only by differing in kind — a surface, a standing post, a stain on stone, a floor deposit. If any two start reading as the same kind of mark, cut one.
+
+### 10.2 The scenario pair
+
+A non-interactive overlook set-piece, reachable at any time. Two hillsides side by side seen from distance, both rendered from real `ClientSite` data at low fidelity — no bespoke assets.
+
+**Left — the clinic.** Immaculate. Every channel cut true, every gate correct, dye traces clean. And a trickle. Ponds barely wet, the gauge needle sitting inside its noise band. *Architecture does not create water.*
+
+**Right — the franchise.** Forty locations, enormous rainfall, one untagged site. Water cuts its own gullies down bare ground and most of it goes in. Its final pool is *small* — but its gauge reads **high**, because at that volume the platforms model confidently over the gaps. Volume without architecture doesn't merely lose data; it produces a confident wrong number.
+
+§4 calls the flood "impressive from a distance," and the overlook *is* the distance — the framing enacts the trap, so it needs almost no copy. One hand-lettered plaque per side. Descend from here into whichever system you're working.
+
+### 10.3 Pool fit-out by `literacy`
+
+`literacy` sets **demand** — how many questions the client brings to the water's edge. What you cut upstream sets **supply**. The fit-out is where they meet.
+
+The furniture itself is given, not chosen: `one-question` gets a single stone step and one gauge; `instrument-wall` gets a bank of gauges, taps and sample bottles along the rim. What each instrument can *read* depends entirely on what you built. **A gauge with nothing plumbed to it sits at rest. A tap with no channel behind it runs dry when opened.** Nothing scores you — you walk down and count how many of the client's questions have an answer behind them.
+
+Every gauge carries a marked **noise band** on the dial. Below it, readings are not meaningful. This is the same object the scenario pair uses, and it is how low volume becomes visible at the deliverable.
+
+Three pictures:
+
+- **Instrument wall over a trickle** — twelve gauges, all alive, every needle inside the noise band. Rigor theater.
+- **One step over a rich system** — the fit-out does not hide the draw-off channels, so nine channels arrive and one gauge reads. What you threw away is visible upstream of the furniture.
+- **One question, wrong thing built** — the single gauge is dead. Needle at rest. This is §6's beautiful empty pool and the best moment in mode B.
+
+### 10.4 The dye run, as a sequence
+
+1. **Charge** — pick a dye and a source interaction on the catchment. Two dyes are available so arrival order is testable.
+2. **Drop** — it enters and runs the culverted network.
+3. **Catch** — you see it live *only* at the checkpoint you are standing at. Five checkpoint types, placed unevenly and not all present in every scenario: below the intake weir, between two gates, at the division lip, at a channel mouth, at a pool inlet. Deliberately not everywhere — the culverting is the point.
+4. **Read the stains** — every checkpoint it passed is marked: present or absent, strong or faint, what color, and in what layer order. Layered marks rhyme with §5.2's silt rather than inventing a second vocabulary.
+5. **Fade** — stains expire. Evidence has a shelf life; want it again, run it again.
+
+The three diagnoses of §5.6, each a distinct physical reading:
+
+- **Absent at 3, present at 2** → walk that reach. A leak, a closed gate, or a grate.
+- **Blue over red when red went first** → arrived out of order. A different fault entirely from not arriving.
+- **Stained the wrong channel, or the right pool in the wrong color** → arrived and was miscategorized.
+
+§5.7 still holds: you cannot read the outcome at the gate you changed. Stains make that walk bearable rather than tedious, without collapsing it into a table.
 
 ## 11. Build order
 

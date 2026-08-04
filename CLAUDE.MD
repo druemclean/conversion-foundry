@@ -1,6 +1,8 @@
 # Project: Conversion Tracking Foundry
 
-A polished, immersive 3D explainer of how digital conversion tracking works. Audience: OpGo new hires and interns who have never set up tracking before. Will deploy to GitHub Pages.
+A polished, immersive 3D explainer of how digital conversion tracking works. Will deploy to GitHub Pages.
+
+**Audience: anyone.** New hires and interns who have never set up tracking are one audience, not the only one. Design for layered depth — a casual visitor gets the big picture by watching; a curious one gets the nuance by toggling. This replaces the earlier intern-only framing, and it raises the bar: copy cannot assume the reader is being onboarded, and nothing may depend on a facilitator standing next to them.
 
 See `foundry.html` for the v1 single-file proof-of-concept (vanilla Three.js r128) — source of truth for layout, station list, copy, and interaction model. Push significantly beyond it on visual fidelity, iconography distinctiveness, and typography.
 

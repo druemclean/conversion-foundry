@@ -7,12 +7,18 @@ export type WaterStop = { at: number; rgb: [number, number, number] };
  * blue-grey and finally near-clear at the pool. Linear-space values, because
  * these are written into a vertex-colour attribute and Three reads those as
  * already linear — the same trap that made the terrain render too bright.
+ *
+ * The luminance spread across the ramp is doing the actual work. A first pass
+ * ran 0.107 to 0.144, which is monotonic — the test passed — but far too
+ * narrow to see: the whole network read as uniformly dark and the grade,
+ * which §7 makes the only chart in the piece, said nothing. Roughly doubling
+ * the top end is what makes "clearer with descent" legible without a legend.
  */
 export const WATER_STOPS: WaterStop[] = [
-  { at: 0.0, rgb: [0.152, 0.101, 0.048] },
-  { at: 0.38, rgb: [0.118, 0.113, 0.055] },
-  { at: 0.72, rgb: [0.086, 0.118, 0.121] },
-  { at: 1.0, rgb: [0.104, 0.152, 0.166] },
+  { at: 0.0, rgb: [0.19, 0.12, 0.052] },
+  { at: 0.38, rgb: [0.165, 0.155, 0.07] },
+  { at: 0.72, rgb: [0.13, 0.18, 0.185] },
+  { at: 1.0, rgb: [0.175, 0.245, 0.27] },
 ];
 
 /** Water colour at flow position `t`, clamped at both ends. */

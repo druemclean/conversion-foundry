@@ -43,13 +43,17 @@ Bound both ends. Where the point is that a human can see something, assert the m
 
 Resolved this pass: the old items 1 (retention legibility), 2 (thin channel water) and 5 (pool `roughness`/`opacity`, now a decision with a test behind it rather than an inherited guess). The tile-boundary hairline was fixed separately by the skirt work in `397c0c0`.
 
-## Decisions waiting on Drue
+## Addendum reconciliation — settled 2026-08-04
 
-1. **Act II runs uphill.** `WATERWORKS_ADDENDUM.md` §2.1 sends conversion packets *up* two return paths to an Events Manager basin at the source tier. Water does not do that, and here it is load-bearing: spec §2 chose water over the tapestry loom precisely because *"water that already ran is gone and cannot be re-routed,"* and §5.1's gate semantics rest on gravity. My recommendation is to **make the return explicitly not water** — a signal line, telegraph wire or armoured cable running back up the hill, visibly a different register from the flow. That is truer to the domain than a loop (a conversion report *is* a message about the water, not the water) and it sharpens Pixel vs CAPI better than colour does: a fragile overhead wire strung through gate territory against a buried armoured cable that bypasses it, with `event_id` a tag clipped to both. Alternatives: keep it descending (the Events Manager basin sits below, and Pixel/CAPI are two inlets to it — which is what §3 already describes), or drop the irreversibility claim, which is expensive.
-2. **Which gate model does §11.3 build?** §5.1's taxonomy (chosen / forced / inherited) or the addendum's concrete UTM gate and consent wall. They are compatible in principle — the concrete gates are instances of the taxonomy — but they imply different first builds.
-3. **The spec's audience line still says "OpGo new hires"**, so it now disagrees with CLAUDE.md, which took the addendum's "designed for anyone" framing. I left the committed design doc alone rather than edit it silently.
+All three open questions are closed. Drue decided 1 and 2; 3 followed.
 
-The rest of the addendum needs no adjudication — §1.2's three degradation states fit the existing dye-and-stain vocabulary (§10.4), §1.3's gclid point is good concrete content for the grates at §10.1, §1.4 does not fight §9.1's anchored DOM instruments, and §2.2's dedup mechanic is already in §3's station mapping almost word for word.
+1. **Act II's return path is a signal line, not water.** Written up as **spec §5.8**, which supersedes the addendum's §2.1. A conversion report is a *message about* the water, so it gets its own register: Pixel as a fragile overhead wire strung through gate territory, CAPI as a buried armoured cable that bypasses it, `event_id` as a tag clipped to both. Gravity — and therefore §5.1's whole gate semantics — survives intact, and the Pixel/CAPI distinction lands *in kind* rather than as two shades of magenta, which matters because §7 has already spent colour on the water's clarity grade. The dedup gate's behaviour carries over from the addendum unchanged.
+2. **Gates are built on §5.1's taxonomy** — chosen, forced, inherited — with the addendum's named gates hung off the kinds afterwards. Recorded in §5.1 and in the §11 build order. The payoff noted there: the UTM gate is chosen on Meta's route and barely operative on Ads (§1.3's gclid point), so *a gate two channels meet and only one notices* becomes the clearest illustration the taxonomy has — and it only falls out if the kinds are built first.
+3. **Audience** is now "anyone" in `CLAUDE.md`, spec §1 and the addendum. No longer in disagreement.
+
+The rest of the addendum needed no adjudication — §1.2's three degradation states fit the existing dye-and-stain vocabulary (§10.4), §1.4 does not fight §9.1's anchored DOM instruments, and §2.2's dedup mechanic was already in §3's station mapping almost word for word. Its Part 1 corrections and its own scope fencing (match-quality and Consent Mode modelling deferred to later sub-toggles) stand as written.
+
+**§11.3 is unblocked.** Act II is sequenced as §11.4b in the build order — lettered, not numbered, because §11.1–§11.3 are referenced by name here and in plan filenames.
 
 ## Conventions that have held for 20 tasks — keep them
 
@@ -63,8 +67,9 @@ The rest of the addendum needs no adjudication — §1.2's three degradation sta
 
 ## Remaining build order
 
-3. **Gates you throw** — next. Blocked only on decision 2 above.
+3. **Gates you throw** — next, and unblocked. Built on §5.1's three kinds; the addendum's named gates hang off them afterwards.
 4. Dye tracing, all three failure modes — §5.6 calls it the highest-value interaction in the piece.
+4b. Signal lines and the dedup gate — §5.8.
 5. `ClientSite` driving the terrain; second and third scenarios.
 6. Modes A and B; the pool fit-out.
 7. Leaks, side channels, retention lines, silt.

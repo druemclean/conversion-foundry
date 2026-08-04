@@ -1,5 +1,24 @@
 # Addendum: Waterworks Sandbox — Data-Model Corrections & Act II (Conversion Loop)
 
+> **Reconciled with the design spec 2026-08-04.** Two decisions were taken; the rest of
+> this document stands as written.
+>
+> 1. **Act II's return paths are a signal line, not water** (§2.1, §2.2 below). Sending
+>    packets *up* the hill would have broken the gravity/irreversibility argument that
+>    spec §2 uses to justify the whole metaphor. The circuit still closes — it closes
+>    with a message travelling on a wire rather than water flowing uphill, which is both
+>    truer to the domain and a sharper way to draw Pixel against CAPI. Full reasoning in
+>    **spec §5.8**, which supersedes §2.1's "fires paired return packets *up* two return
+>    paths" and recasts §2.2's paired packets as paired *messages*. Everything else in
+>    §2 — the dedup gate's merge-vs-double-splash, the three teaching scenarios, the
+>    Events Manager card, guided vs sandbox, the scope fencing — carries over unchanged.
+> 2. **Gates are built on spec §5.1's taxonomy** — chosen, forced, inherited — and the
+>    named gates in Part 1 hang off those kinds afterwards. They are not rivals: the UTM
+>    gate and the consent wall are instances. See spec §5.1 for why that order matters,
+>    and note that §1.3's gclid point becomes the clearest illustration the taxonomy has.
+>
+> Audience note accepted and propagated to `CLAUDE.md` and spec §1.
+
 For the session drafting the waterworks build plan. This documents (1) corrections to the
 dual-track data model from the Gemini reference file (`dist/waterworks_simulation.tsx`),
 and (2) the design for Act II — the Pixel vs. CAPI conversion loop. The Gemini file is a

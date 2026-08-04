@@ -8,7 +8,9 @@
 
 ## 1. What this is
 
-A second explainer of conversion tracking for OpGo new hires, teaching the same concepts as the Conversion Foundry through an entirely different physical model: **a hand-built water system on a hillside you were handed.**
+A second explainer of conversion tracking, teaching the same concepts as the Conversion Foundry through an entirely different physical model: **a hand-built water system on a hillside you were handed.**
+
+**Audience: anyone** *(revised 2026-08-04)*. New hires and interns who have never set up tracking are one audience, not the only one. Design for layered depth — a casual visitor gets the big picture by watching; a curious one gets the nuance by toggling. This raises the bar rather than relaxing it: copy cannot assume the reader is being onboarded, and nothing may depend on a facilitator standing next to them.
 
 The Foundry is an object you orbit. The Waterworks is a system you **operate**. It is always running.
 
@@ -68,6 +70,7 @@ Off-system features:
 - **Leaks** — loss *between* stages, mid-channel.
 - **Side channels** — retroactive draws from a platform pool (§5.4).
 - **Silt** — the immutable record, in every pond.
+- **Signal lines** — the conversion report travelling back up the hill. Not water. See §5.8.
 
 ### Station mapping
 
@@ -148,6 +151,14 @@ Three kinds, and the distinction matters more than any other single idea here:
 
 Inherited is the frightening category: no decision to find, no annotation anyone wrote, and the number still isn't what it says it is. Low `monthlyVolume` produces more of them.
 
+**This taxonomy governs the build, decided 2026-08-04.** `WATERWORKS_ADDENDUM.md` §1 names concrete gates — a UTM gate, a consent wall — and the choice between the two framings was live. They are not rivals: the concrete gates are *instances* of the taxonomy, and building the taxonomy first is what makes them legible when they arrive.
+
+- The **consent wall** is a forced gate. The ground decided; you did not.
+- The **UTM gate** is chosen on Meta's route and, per the addendum's §1.3, barely operative on Google Ads, because Ads attribution rides on auto-tagging rather than manual tags. *A gate that two channels meet and only one of them notices* is the single clearest illustration of the taxonomy available, and it falls out of building the taxonomy first.
+- **Modelled conversions and thresholded rows** are inherited. Nobody was told.
+
+Build the kinds, then hang the named gates on them. Building the named gates first would produce two special cases and no idea.
+
 ### 5.2 Silt — the immutable record
 
 Every pond accumulates layered sediment. Each layer's composition reflects the gate positions in force when it settled. Change the definition in March and the silt above the March line is a different color.
@@ -193,6 +204,28 @@ This is the single highest-value interaction in the piece and should be built fi
 ### 5.7 The oscillation
 
 Walk **upstream** to find the fault. Walk **down** to see if it cleared. You cannot evaluate a change from the gate where you made it — the only place a gate change is legible is the pool, and forcing the walk is the point. It is the felt experience of the job and the reason tracking work is slow.
+
+### 5.8 Signal lines — reporting back up the hill
+
+*Resolved 2026-08-04. This section exists because `WATERWORKS_ADDENDUM.md` §2 asked for a closed loop, and the obvious way to draw one would have broken the model.*
+
+Conversions have to get **back** to the ad platform. The addendum proposed sending paired return packets *up* two return paths to a Meta Events Manager basin at the source tier, closing the circuit visibly.
+
+**Water cannot do that, and here that is not pedantry — it is the load-bearing beam.** §2 chose water over the tapestry loom precisely because *water that already ran is gone and cannot be re-routed*, and §5.1's entire gate semantics rest on gravity: throw a gate and everything after obeys, everything before never will. A system where things travel back upstream quietly stops teaching the one idea the metaphor was selected to teach.
+
+**The resolution: the return path is not water. It is a signal line.**
+
+A conversion report *is* a message about the water, not the water — so it gets its own physical register, running back up the hill alongside the channels and visibly not flowing. Gravity survives untouched, and the distinction the addendum most wants to teach gets sharper than colour could make it:
+
+- **Pixel** — a fragile overhead wire, strung on poles through gate territory. The consent wall and the ad blocker are physical obstructions *on its route*. Cut the wire and the message never arrives.
+- **CAPI** — a buried armoured cable. It leaves from the same place and bypasses the gate territory entirely, because it is not in the browser's world at all.
+- **`event_id`** — a tag clipped to both messages. Same tag, one arrival gets logged. No tag, two.
+
+This also fixes an asymmetry the addendum's packet version carried: two magenta packets differing only in opacity is a colour distinction, and §7 has already spent colour on the water's clarity grade. An overhead wire versus a buried cable differs **in kind**, which is the same test §10.1 applies to the four pool-wall marks.
+
+The dedup gate keeps its behaviour from the addendum — merge on arrival with `event_id` set, two separate arrivals without it, and the count visibly inflating. What changes is only what travels: a message on a line, not water in a channel.
+
+**Deferred, unchanged from the addendum's own fencing:** the match-quality filter and Consent Mode modelling are later sub-toggles. Reserve room for them; do not build them first.
 
 ---
 
@@ -355,8 +388,9 @@ The three diagnoses of §5.6, each a distinct physical reading:
 
 1. Static hillside for one scenario at the agreed fidelity. No interaction. Look at it.
 2. Flowing water — rills, channels, ponds, the color grade.
-3. Gates: throw one, watch downstream change and upstream history persist.
+3. Gates: throw one, watch downstream change and upstream history persist. **Built on §5.1's three kinds — chosen, forced, inherited — not on the addendum's named gates**; the named ones hang off the kinds afterwards. See §5.1.
 4. Dye tracing, all three failure modes.
+4b. **Signal lines and the dedup gate** — §5.8. Added 2026-08-04 from `WATERWORKS_ADDENDUM.md` §2. Lettered rather than numbered on purpose: §11.1–§11.3 are referenced by name in the handoff and in plan filenames, and renumbering would silently break them. Sits here because it reuses dye tracing's vocabulary — a thing you follow through the network, read at the points open to the sky.
 5. `ClientSite` driving the terrain; second and third scenarios.
 6. Modes A and B; the pool fit-out.
 7. Leaks, side channels, retention lines, silt.

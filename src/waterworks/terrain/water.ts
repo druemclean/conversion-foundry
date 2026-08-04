@@ -18,6 +18,8 @@ export const WATER_SURFACE = {
   freeboard: 0.05,
   /** Water always stands at least this far above its own bed. */
   bedClearance: 0.02,
+  /** How far under the water plane a ribbon edge must sit to count as wet. */
+  edgeClearance: 0.01,
 
   channelOpacity: 0.88,
   channelRoughness: 0.2,
@@ -105,17 +107,81 @@ export function waterColor(t: number): [number, number, number] {
 /**
  * A water surface following a channel centreline.
  *
- * `inset` lifts the surface off the channel bed. The bed is the deepest point
- * of the cut, so the surface is placed relative to the *bank* height at each
- * side sample and then lowered — water that stands proud of its own bank is
- * the most obvious wrongness available, and the test asserts it cannot.
+ * Water is placed by *fill level*, not by offset from the ground: one level
+ * `y` per cross-section at `bed + depth * channelFill`, clamped so it can
+ * neither top the rim of its own cut nor sink back to the bed.
+ *
+ * The predecessor offset the surface below `min(bed, bank)`, which put all
+ * eleven channels underground — mean burial 0.42 units — and what reached the
+ * screen was the buried ribbon z-fighting through a terrain tessellated at
+ * 0.4. Both bank vertices now share one `y`, because a water surface is level
+ * across its width and per-bank sampling tilted it on every cross slope.
+ *
+ * Two samplers, not one, because they answer different questions:
+ * - `groundAt` is the real rendered surface — pads included — and is what the
+ *   water actually rests on (`bed`).
+ * - `bankAt` is the excavated ground *without* structure pads, and is what the
+ *   rim guard checks against. A pad is a levelled building platform:
+ *   `resolvePads` sets `pad.level = carvedGround(centre)`, which for a pad
+ *   sitting on a channel centreline is the channel bed itself, and every pad's
+ *   footprint is wider than the cut it sits on. Guarding against `groundAt`
+ *   at the rim would read that flattened bed back at the rim sample and
+ *   conclude "no banks here" at exactly the four places a viewer looks
+ *   hardest — the intake weir, both sluice gates, and the division lip —
+ *   pinning the water to `bedClearance` right at each structure. `bankAt`
+ *   still respects real excavation, so junction cuts and basin mouths still
+ *   lower the guard correctly; it just isn't fooled by a building sitting on
+ *   top of the ground.
  *
  * Returns typed arrays rather than geometry so this stays testable in Node.
  */
+
+/**
+ * The largest radius on one side of a cross-section at which the ground is
+ * still below the water plane — the real waterline, measured rather than
+ * modelled.
+ *
+ * An analytic width cannot do this job. At this fill the idealised cut
+ * profile leaves the ribbon edge only `depth * 0.056` below the bank — about
+ * 0.03 units on these channels — while the terrain's micro-relief runs to
+ * ±0.2. Measured, that made every edge a coin flip: mean margins of 0.01 to
+ * 0.05 against tenth-percentile margins of -0.07 to -0.24, and half of all
+ * ribbon edges came out buried in the bank they were supposed to sit inside.
+ *
+ * Searching the surface makes the edge correct by construction, and lets the
+ * ribbon widen wherever the bank allows instead of holding one conservative
+ * fraction everywhere. `waterHalfWidth` remains the model this searches
+ * around: it sets both the outer bound and the fallback.
+ *
+ * `nx`/`nz` arrive already signed for the side being measured.
+ */
+function waterlineRadius(
+  cut: ChannelCut,
+  px: number,
+  pz: number,
+  nx: number,
+  nz: number,
+  y: number,
+  groundAt: (x: number, z: number) => number,
+): number {
+  const estimate = waterHalfWidth(cut);
+  const outer = Math.min(cut.halfWidth * 0.97, estimate * 1.4);
+  const inner = estimate * 0.45;
+  const steps = 14;
+
+  // Walk inward from the outer bound and take the first radius that is
+  // genuinely wet, so the ribbon is as wide as the ground actually permits.
+  for (let i = 0; i <= steps; i++) {
+    const r = outer + ((inner - outer) * i) / steps;
+    if (groundAt(px + nx * r, pz + nz * r) < y - WATER_SURFACE.edgeClearance) return r;
+  }
+  return inner;
+}
+
 export function buildChannelRibbon(
   cut: ChannelCut,
-  height: (x: number, z: number) => number,
-  inset: number,
+  groundAt: (x: number, z: number) => number,
+  bankAt: (x: number, z: number) => number,
 ): {
   positions: Float32Array;
   uvs: Float32Array;
@@ -128,7 +194,6 @@ export function buildChannelRibbon(
   const colors = new Float32Array(n * 2 * 3);
   const indices = new Uint32Array((n - 1) * 6);
 
-  const halfWidth = cut.halfWidth * 0.72;
   let run = 0;
 
   for (let i = 0; i < n; i++) {
@@ -145,15 +210,33 @@ export function buildChannelRibbon(
 
     const t = cut.flowFrom + (cut.flowTo - cut.flowFrom) * (n === 1 ? 0 : i / (n - 1));
     const rgb = waterColor(t);
-    const bed = height(p.x, p.z);
+    const bed = groundAt(p.x, p.z);
+
+    // The rim is sampled at the cut's full half-width, where the incision
+    // profile has returned to grade. Sampling at the ribbon's edge instead
+    // would read ground that is below the water by design and drag the
+    // surface straight back down to the bed. Sampled against `bankAt`
+    // (excavation only, no pads) — see the doc comment above.
+    const rimA = bankAt(p.x + nx * cut.halfWidth, p.z + nz * cut.halfWidth);
+    const rimB = bankAt(p.x - nx * cut.halfWidth, p.z - nz * cut.halfWidth);
+    const guard = Math.min(rimA, rimB) - WATER_SURFACE.freeboard;
+    // The bed clearance wins over the rim guard, which matters at a channel
+    // mouth: there the rim samples land inside the pond and sit below the
+    // channel bed, and obeying them would bury the last few metres.
+    const y = Math.max(
+      bed + WATER_SURFACE.bedClearance,
+      Math.min(bed + cut.depth * WATER_SURFACE.channelFill, guard),
+    );
 
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -1 : 1;
-      const x = p.x + nx * sign * halfWidth;
-      const z = p.z + nz * sign * halfWidth;
-      // Sit below whichever is lower, the bed at centre or the bank here, so
-      // the surface can never break through the ground on a cross slope.
-      const y = Math.min(bed, height(x, z)) - inset;
+      // Each side finds its own waterline: on a cross slope the two banks are
+      // at different heights, so a single shared half-width would bury one
+      // edge to keep the other wet. The surface stays level regardless — `y`
+      // is computed once per cross-section, above.
+      const r = waterlineRadius(cut, p.x, p.z, nx * sign, nz * sign, y, groundAt);
+      const x = p.x + nx * sign * r;
+      const z = p.z + nz * sign * r;
 
       const v = (i * 2 + side) * 3;
       positions[v] = x;

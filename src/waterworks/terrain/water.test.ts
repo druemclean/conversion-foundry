@@ -8,7 +8,8 @@ import {
   waterHalfWidth,
 } from './water';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
-import { carvedHeight } from './heightfield';
+import { carvedGround, carvedHeight } from './heightfield';
+import { distanceToPolyline } from './path';
 
 const luma = (c: [number, number, number]) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
 
@@ -51,9 +52,26 @@ describe('waterColor', () => {
 
 describe('buildChannelRibbon', () => {
   const cut = DENTIST_CHANNELS.find((c) => c.id === 'gated-reach')!;
-  const height = (x: number, z: number) =>
+  const groundAt = (x: number, z: number) =>
     carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
-  const ribbon = buildChannelRibbon(cut, height, 0.12);
+  // Excavation only, no structure pads — see buildChannelRibbon's doc comment
+  // for why the rim guard needs this rather than `groundAt`.
+  const bankAt = (x: number, z: number) => carvedGround(x, z, DENTIST_CHANNELS, DENTIST_BASINS);
+  const ribbon = buildChannelRibbon(cut, groundAt, bankAt);
+
+  // A channel has no bank in two places, and in both the guard is correctly
+  // inoperative: where it opens into a pond, and where it forks. Rim samples
+  // there land inside the basin or inside the neighbouring cut, so "stay
+  // below your bank" has nothing to bite on — and the water is under the pool
+  // disc or in the fork regardless. Exposure is measured on the reaches that
+  // do have banks, at a higher bar than a whole-channel average could carry.
+  const insideBasin = (x: number, z: number) =>
+    DENTIST_BASINS.some((b) => Math.hypot(x - b.center.x, z - b.center.z) <= b.radius);
+
+  const atJunction = (cut: (typeof DENTIST_CHANNELS)[number], x: number, z: number) =>
+    DENTIST_CHANNELS.some(
+      (other) => other.id !== cut.id && distanceToPolyline(x, z, other.pts) <= other.halfWidth,
+    );
 
   it('emits two vertices per centreline sample', () => {
     expect(ribbon.positions.length).toBe(cut.pts.length * 2 * 3);
@@ -84,20 +102,72 @@ describe('buildChannelRibbon', () => {
     expect(lastY).toBeLessThan(firstY);
   });
 
-  it('never stands above the ground beside it', () => {
-    // Water above its own bank is the single most obvious wrongness available.
-    for (let i = 0; i < ribbon.positions.length; i += 3) {
-      const x = ribbon.positions[i];
+  it('keeps every cross-section level', () => {
+    // A water surface is level across its width. Sampling the bank height
+    // per side tilted the ribbon on every cross slope.
+    for (let i = 0; i < ribbon.positions.length; i += 6) {
+      expect(ribbon.positions[i + 4]).toBeCloseTo(ribbon.positions[i + 1], 9);
+    }
+  });
+
+  it('stands in its cut, neither buried nor overfilled', () => {
+    // The regression this plan exists for, bounded from both sides. The old
+    // code placed the surface below the lower of bed and bank, so all 62
+    // vertices of this channel — and of the other ten — were underground by
+    // 0.35 to 0.89 units, and the one-sided assertion that replaced this one
+    // passed anyway.
+    //
+    // Lower bound: a direction-only check would pass on a one-micron film, so
+    // the water has to be a real fraction of the cut deep. Upper bound: you
+    // cannot fill a channel deeper than you dug it. Both are stated against
+    // the cut's own depth rather than against nearby ground — on a cross
+    // slope, water at this fill legitimately sits above the hillside a couple
+    // of metres downslope, which is what a bank is for.
+    let counted = 0;
+    const total = ribbon.positions.length / 6;
+    for (let i = 0; i < ribbon.positions.length; i += 6) {
       const y = ribbon.positions[i + 1];
-      const z = ribbon.positions[i + 2];
-      expect(y).toBeLessThanOrEqual(height(x, z) + 1e-6);
+      // The centreline lies midway between the two bank vertices.
+      const cx = (ribbon.positions[i] + ribbon.positions[i + 3]) / 2;
+      const cz = (ribbon.positions[i + 2] + ribbon.positions[i + 5]) / 2;
+      if (insideBasin(cx, cz) || atJunction(cut, cx, cz)) continue;
+      counted++;
+      const standing = y - groundAt(cx, cz);
+
+      expect(standing).toBeGreaterThan(cut.depth * 0.4);
+      expect(standing).toBeLessThanOrEqual(cut.depth + 1e-6);
+    }
+    // Two-sided: the exclusion must not be allowed to excuse the whole
+    // channel. If a filter can drop every awkward sample, the bar above it
+    // means nothing.
+    expect(counted).toBeGreaterThan(total * 0.35);
+  });
+
+  it('shows water at the surface everywhere the channel has banks', () => {
+    // The bug was uniform across all eleven cuts, so the guard has to be too.
+    for (const c of DENTIST_CHANNELS) {
+      const r = buildChannelRibbon(c, groundAt, bankAt);
+      let exposed = 0;
+      let counted = 0;
+      let total = 0;
+      for (let i = 0; i < r.positions.length; i += 3) {
+        const x = r.positions[i];
+        const y = r.positions[i + 1];
+        const z = r.positions[i + 2];
+        total++;
+        if (insideBasin(x, z) || atJunction(c, x, z)) continue;
+        counted++;
+        if (y > groundAt(x, z)) exposed++;
+      }
+      // Two-sided: the exclusion must not be allowed to excuse a whole
+      // channel. If a filter can drop every awkward sample, the bar above it
+      // means nothing.
+      expect(counted).toBeGreaterThan(total * 0.35);
+      expect(exposed / counted).toBeGreaterThan(0.95);
     }
   });
 
   it('carries a flow coordinate that increases downstream', () => {
-    // Four floats per sample: [u, run] for each of the two bank vertices. The
-    // run is what the ripple scrolls along, so it has to be monotonic or the
-    // water would appear to change direction mid-channel.
     let prev = -Infinity;
     for (let i = 1; i < ribbon.uvs.length; i += 4) {
       expect(ribbon.uvs[i]).toBeGreaterThanOrEqual(prev);
@@ -106,16 +176,12 @@ describe('buildChannelRibbon', () => {
   });
 
   it('gives both banks of a sample the same flow coordinate', () => {
-    // Otherwise the ripple would shear across the channel instead of running
-    // down it.
     for (let i = 1; i + 2 < ribbon.uvs.length; i += 4) {
       expect(ribbon.uvs[i + 2]).toBeCloseTo(ribbon.uvs[i], 9);
     }
   });
 
   it('separates the two banks across the ribbon', () => {
-    // u distinguishes left bank from right; if both were 0 the ripple would
-    // have no cross-channel coordinate at all.
     expect(ribbon.uvs[0]).toBe(0);
     expect(ribbon.uvs[2]).toBe(1);
   });

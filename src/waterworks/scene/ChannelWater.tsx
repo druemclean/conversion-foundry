@@ -2,13 +2,9 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
-import { carvedHeight } from '../terrain/heightfield';
+import { carvedGround, carvedHeight } from '../terrain/heightfield';
 import { buildChannelRibbon } from '../terrain/water';
 import { createWaterMaterial } from './waterMaterial';
-
-// Lifts the surface off the bed, per buildChannelRibbon's contract — the same
-// figure every other scene component that samples the terrain leaves alone.
-const INSET = 0.1;
 
 /**
  * Running water in every cut channel — spec §11.2 Task 2. One merged geometry
@@ -18,6 +14,9 @@ const INSET = 0.1;
 export default function ChannelWater() {
   const geometry = useMemo(() => {
     const height = (x: number, z: number) => carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
+    // Excavation only, no structure pads — see buildChannelRibbon's doc
+    // comment for why the rim guard needs this rather than `height`.
+    const bank = (x: number, z: number) => carvedGround(x, z, DENTIST_CHANNELS, DENTIST_BASINS);
 
     const positions: number[] = [];
     const uvs: number[] = [];
@@ -26,7 +25,7 @@ export default function ChannelWater() {
     let vertexOffset = 0;
 
     for (const cut of DENTIST_CHANNELS) {
-      const ribbon = buildChannelRibbon(cut, height, INSET);
+      const ribbon = buildChannelRibbon(cut, height, bank);
 
       positions.push(...ribbon.positions);
       uvs.push(...ribbon.uvs);

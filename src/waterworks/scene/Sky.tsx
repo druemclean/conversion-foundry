@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { WW_PALETTE } from '../tokens';
 
@@ -36,6 +36,11 @@ export default function Sky() {
       }),
     [],
   );
+
+  // Same reason as Terrain's geometry: R3F only auto-disposes what it attached
+  // via JSX, and this material is a prop. The sphereGeometry below is a JSX
+  // child and is handled for us.
+  useEffect(() => () => material.dispose(), [material]);
 
   return (
     <mesh material={material} frustumCulled={false}>

@@ -3,14 +3,24 @@ import {
   baseFall,
   buildTerrainColors,
   buildTerrainGrid,
+  carvedGround,
   carvedHeight,
+  channelIncision,
   clamp01,
+  resolvePads,
   smoothstep,
   srgbToLinear,
   surfaceHeight,
   TERRAIN,
 } from './heightfield';
-import { DENTIST_BASINS, DENTIST_CHANNELS } from '../content/layout';
+import {
+  DENTIST_BASINS,
+  DENTIST_CHANNELS,
+  DENTIST_PAD_SPECS,
+  DENTIST_PADS,
+  DIVISION_LIP,
+  HEADWORKS,
+} from '../content/layout';
 
 describe('clamp01', () => {
   it('clamps both ends', () => {
@@ -80,9 +90,122 @@ describe('carvedHeight', () => {
 
   it('hollows out each basin to roughly its stated depth', () => {
     for (const basin of DENTIST_BASINS) {
-      const floor = carvedHeight(basin.center.x, basin.center.z, [], DENTIST_BASINS);
+      const floor = carvedHeight(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
       const grade = surfaceHeight(basin.center.x, basin.center.z);
       expect(grade - floor).toBeGreaterThan(basin.depth * 0.9);
+      expect(grade - floor).toBeLessThan(basin.depth * 1.15);
+    }
+  });
+});
+
+describe('channelIncision', () => {
+  it('takes the deepest overlapping cut, never their sum', () => {
+    // Four cuts converge at the headworks and four leave the division lip.
+    // Summing gave 2.35 and 2.95; the deepest single contributor is 0.85.
+    for (const at of [HEADWORKS, DIVISION_LIP]) {
+      const incision = channelIncision(at.x, at.z, DENTIST_CHANNELS);
+      const deepestCut = Math.max(...DENTIST_CHANNELS.map((c) => c.depth));
+      expect(incision).toBeLessThanOrEqual(deepestCut + 1e-9);
+    }
+  });
+
+  it('still cuts to full depth on a lone channel centreline', () => {
+    const rill = DENTIST_CHANNELS[0];
+    const early = rill.pts[1];
+    expect(channelIncision(early.x, early.z, [rill])).toBeCloseTo(rill.depth, 6);
+  });
+});
+
+describe('carvedGround', () => {
+  it('bounds every basin excavation on BOTH sides', () => {
+    // The old assertion was a lower bound only, so a 3x-too-deep basin passed.
+    for (const basin of DENTIST_BASINS) {
+      const floor = carvedGround(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
+      const grade = surfaceHeight(basin.center.x, basin.center.z);
+      expect(grade - floor).toBeGreaterThan(basin.depth * 0.9);
+      expect(grade - floor).toBeLessThan(basin.depth * 1.15);
+    }
+  });
+
+  it('gives every basin a flat floor', () => {
+    for (const basin of DENTIST_BASINS) {
+      const inner = basin.radius - basin.rimWidth;
+      const heights: number[] = [];
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+        for (const frac of [0, 0.45, 0.9]) {
+          const x = basin.center.x + Math.cos(a) * inner * frac;
+          const z = basin.center.z + Math.sin(a) * inner * frac;
+          heights.push(carvedGround(x, z, DENTIST_CHANNELS, DENTIST_BASINS));
+        }
+      }
+      const spread = Math.max(...heights) - Math.min(...heights);
+      expect(spread).toBeLessThan(0.02);
+    }
+  });
+});
+
+describe('pads', () => {
+  it('levels the ground flat across each pad', () => {
+    for (const pad of DENTIST_PADS) {
+      const heights: number[] = [];
+      const cos = Math.cos(pad.angle);
+      const sin = Math.sin(pad.angle);
+      for (const fx of [-0.9, -0.45, 0, 0.45, 0.9]) {
+        for (const fz of [-0.9, 0, 0.9]) {
+          const lx = fx * pad.halfWidth;
+          const lz = fz * pad.halfLength;
+          // Forward Y-rotation back into world space.
+          const x = pad.center.x + lx * cos + lz * sin;
+          const z = pad.center.z - lx * sin + lz * cos;
+          heights.push(carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS));
+        }
+      }
+      const spread = Math.max(...heights) - Math.min(...heights);
+      expect(spread).toBeLessThan(0.02);
+    }
+  });
+
+  it('sets each pad level from the un-padded ground beneath it', () => {
+    for (const pad of DENTIST_PADS) {
+      expect(pad.level).toBeCloseTo(
+        carvedGround(pad.center.x, pad.center.z, DENTIST_CHANNELS, DENTIST_BASINS),
+        6,
+      );
+    }
+  });
+
+  it('leaves ground well outside every pad untouched', () => {
+    const far = { x: 26, z: -34 };
+    expect(carvedHeight(far.x, far.z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS)).toBeCloseTo(
+      carvedGround(far.x, far.z, DENTIST_CHANNELS, DENTIST_BASINS),
+      6,
+    );
+  });
+
+  it('does not let one pad shift another pad level', () => {
+    const reordered = resolvePads(
+      [...DENTIST_PAD_SPECS].reverse(),
+      DENTIST_CHANNELS,
+      DENTIST_BASINS,
+    );
+    for (const pad of DENTIST_PADS) {
+      const twin = reordered.find((p) => p.id === pad.id);
+      expect(twin).toBeDefined();
+      expect(twin!.level).toBeCloseTo(pad.level, 9);
+    }
+  });
+
+  it('keeps every pad core clear of every other pad core', () => {
+    // Two platforms at two different levels cannot both be true at a point.
+    // The disc-shaped pads this replaced overlapped and un-levelled each other.
+    for (const a of DENTIST_PADS) {
+      for (const b of DENTIST_PADS) {
+        if (a.id === b.id) continue;
+        const gap = Math.hypot(a.center.x - b.center.x, a.center.z - b.center.z);
+        const reachA = Math.hypot(a.halfWidth, a.halfLength) + a.blend;
+        const reachB = Math.hypot(b.halfWidth, b.halfLength) + b.blend;
+        expect(gap).toBeGreaterThan(Math.min(reachA, reachB));
+      }
     }
   });
 });

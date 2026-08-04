@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distanceToPolyline, meander, polylineLength, sampleSpline, type Vec2 } from './path';
+import { distanceToPolyline, meander, polylineLength, sampleSpline, tangentAngle, type Vec2 } from './path';
 
 const STRAIGHT: Vec2[] = [
   { x: 0, z: 0 },
@@ -75,5 +75,36 @@ describe('polylineLength', () => {
 
   it('is zero for a degenerate polyline', () => {
     expect(polylineLength([{ x: 1, z: 1 }])).toBe(0);
+  });
+});
+
+describe('tangentAngle', () => {
+  it('reads zero along a due-north polyline', () => {
+    expect(tangentAngle(STRAIGHT, 0, 15)).toBeCloseTo(0, 6);
+  });
+
+  it('reads a right angle along a due-east polyline', () => {
+    const east: Vec2[] = [
+      { x: 0, z: 0 },
+      { x: 10, z: 0 },
+      { x: 20, z: 0 },
+    ];
+    expect(tangentAngle(east, 10, 0)).toBeCloseTo(Math.PI / 2, 6);
+  });
+
+  it('tracks a bend rather than averaging the whole path', () => {
+    const bend: Vec2[] = [
+      { x: 0, z: 0 },
+      { x: 0, z: 10 },
+      { x: 10, z: 20 },
+      { x: 20, z: 20 },
+    ];
+    const atStart = tangentAngle(bend, 0, 0);
+    const atEnd = tangentAngle(bend, 20, 20);
+    expect(Math.abs(atEnd - atStart)).toBeGreaterThan(1);
+  });
+
+  it('is safe on a degenerate polyline', () => {
+    expect(tangentAngle([{ x: 1, z: 1 }], 0, 0)).toBe(0);
   });
 });

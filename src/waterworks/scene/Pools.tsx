@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { DENTIST_BASINS, DENTIST_CHANNELS, type BasinSpec } from '../content/layout';
+import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS, type BasinSpec } from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
 import { WW_PALETTE } from '../tokens';
 
 function floorOf(basin: BasinSpec): number {
-  return carvedHeight(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
+  return carvedHeight(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
 }
 
 /**

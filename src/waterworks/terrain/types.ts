@@ -1,0 +1,40 @@
+import type { Vec2 } from './path';
+
+export type ChannelCut = {
+  id: string;
+  pts: Vec2[];
+  /** Half-width of the cut at grade, in world units. */
+  halfWidth: number;
+  /** Incision below surrounding grade, in world units. */
+  depth: number;
+};
+
+export type BasinSpec = {
+  id: string;
+  label: string;
+  center: Vec2;
+  radius: number;
+  depth: number;
+  /** How far in from the rim the floor flattens out. */
+  rimWidth: number;
+  /** Retention line height as a fraction of depth, measured from the floor. */
+  retentionFrac: number;
+};
+
+/** A levelled platform for a structure to stand on. */
+export type PadSpec = {
+  id: string;
+  center: Vec2;
+  /** Y-rotation of the platform, matching the structure standing on it. */
+  angle: number;
+  /** Half-extent across the flow (the platform's local X). */
+  halfWidth: number;
+  /** Half-extent along the flow (local Z). Keep small — this is the axis the
+   *  channel falls along, and flattening it would stop the water. */
+  halfLength: number;
+  /** Graded batter back to surrounding ground, beyond the flat core. */
+  blend: number;
+};
+
+/** A PadSpec with its height resolved against the un-padded terrain. */
+export type ResolvedPad = PadSpec & { level: number };

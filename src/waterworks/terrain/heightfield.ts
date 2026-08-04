@@ -1,7 +1,7 @@
-import type { BasinSpec, ChannelCut } from '../content/layout';
 import { WW_PALETTE } from '../tokens';
 import { fbm2D } from './noise';
 import { distanceToPolyline } from './path';
+import type { BasinSpec, ChannelCut, PadSpec, ResolvedPad } from './types';
 
 export const TERRAIN = {
   xMin: -30,
@@ -50,29 +50,110 @@ export function surfaceHeight(x: number, z: number): number {
 }
 
 /**
- * Ground after the basins were dug and the channels cut. Both basin and
- * channel incisions are subtracted from undisturbed grade; the order between
- * the two loops doesn't affect the result, since neither term reads the
- * running height `h` — each only depends on (x, z) and static geometry.
+ * Depth of the deepest single channel incision at this point.
+ *
+ * Union, not sum. Digging two channels that cross does not make a hole twice
+ * as deep — the ground is simply excavated to whichever bed is lower. Summing
+ * turned every junction into a pit: 2.35 units at the intake weir where the
+ * deepest contributing cut is 0.85, which buried the weir and the division
+ * lip below their own ground.
+ */
+export function channelIncision(x: number, z: number, cuts: ChannelCut[]): number {
+  let deepest = 0;
+  for (const cut of cuts) {
+    const d = distanceToPolyline(x, z, cut.pts);
+    if (d > cut.halfWidth) continue;
+    const incision = cut.depth * smoothstep(cut.halfWidth, 0, d);
+    if (incision > deepest) deepest = incision;
+  }
+  return deepest;
+}
+
+/**
+ * Ground after channels and basins, before any structure pads.
+ *
+ * A dug basin has a flat floor — you do not excavate a pond and leave the
+ * bottom following the hillside. So a basin is an assignment toward a level,
+ * not a constant subtraction: inside the floor zone the height is exactly
+ * `surfaceHeight(centre) - depth`, blending back to grade across the rim.
+ * That is what makes a single-point floor sample valid for the fittings that
+ * stand in it.
+ */
+export function carvedGround(x: number, z: number, cuts: ChannelCut[], basins: BasinSpec[]): number {
+  let h = surfaceHeight(x, z) - channelIncision(x, z, cuts);
+
+  for (const basin of basins) {
+    const d = Math.hypot(x - basin.center.x, z - basin.center.z);
+    const t = smoothstep(basin.radius, basin.radius - basin.rimWidth, d);
+    if (t <= 0) continue;
+    const floorLevel = surfaceHeight(basin.center.x, basin.center.z) - basin.depth;
+    h += (floorLevel - h) * t;
+  }
+
+  return h;
+}
+
+/**
+ * Resolve each pad's height against the un-padded terrain. Done once, at
+ * module load — a pad's level must not depend on other pads, or the result
+ * would depend on declaration order.
+ */
+export function resolvePads(
+  specs: PadSpec[],
+  cuts: ChannelCut[],
+  basins: BasinSpec[],
+): ResolvedPad[] {
+  return specs.map((spec) => ({
+    ...spec,
+    level: carvedGround(spec.center.x, spec.center.z, cuts, basins),
+  }));
+}
+
+/**
+ * Final ground: channels, basins, then levelled pads under the structures.
+ *
+ * You level a site before you build on it. Without pads, a rigid 7.2-unit
+ * stone lip anchored at one sampled height sits underground at one end and
+ * floats at the other, because the hillside beneath it falls by more than the
+ * object is tall.
  */
 export function carvedHeight(
   x: number,
   z: number,
   cuts: ChannelCut[],
   basins: BasinSpec[],
+  pads: ResolvedPad[] = [],
 ): number {
-  let h = surfaceHeight(x, z);
+  let h = carvedGround(x, z, cuts, basins);
 
-  for (const basin of basins) {
-    const d = Math.hypot(x - basin.center.x, z - basin.center.z);
-    h -= basin.depth * smoothstep(basin.radius, basin.radius - basin.rimWidth, d);
+  // Highest influence wins rather than blending sequentially. Two platforms at
+  // two different levels cannot both be true at the same point, and a
+  // sequential lerp made the result depend on declaration order — which is how
+  // overlapping pads silently un-levelled each other.
+  let best: ResolvedPad | null = null;
+  let bestT = 0;
+
+  for (const pad of pads) {
+    const dx = x - pad.center.x;
+    const dz = z - pad.center.z;
+    const cos = Math.cos(pad.angle);
+    const sin = Math.sin(pad.angle);
+    // Inverse of a Three.js Y-rotation: local +Z maps to (sin, cos) in world.
+    const lx = dx * cos - dz * sin;
+    const lz = dx * sin + dz * cos;
+
+    const outX = Math.max(0, Math.abs(lx) - pad.halfWidth);
+    const outZ = Math.max(0, Math.abs(lz) - pad.halfLength);
+    const outside = Math.hypot(outX, outZ);
+
+    const t = smoothstep(pad.blend, 0, outside);
+    if (t > bestT) {
+      bestT = t;
+      best = pad;
+    }
   }
 
-  for (const cut of cuts) {
-    const d = distanceToPolyline(x, z, cut.pts);
-    if (d > cut.halfWidth) continue;
-    h -= cut.depth * smoothstep(cut.halfWidth, 0, d);
-  }
+  if (best !== null) h += (best.level - h) * bestT;
 
   return h;
 }

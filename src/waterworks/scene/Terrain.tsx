@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { DENTIST_BASINS, DENTIST_CHANNELS } from '../content/layout';
+import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
 import { buildTerrainColors, buildTerrainGrid, carvedHeight } from '../terrain/heightfield';
 
 export default function Terrain() {
   const geometry = useMemo(() => {
     const { positions, indices } = buildTerrainGrid((x, z) =>
-      carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS),
+      carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS),
     );
     const colors = buildTerrainColors(positions);
 

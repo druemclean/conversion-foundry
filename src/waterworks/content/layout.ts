@@ -1,25 +1,8 @@
-import { meander, sampleSpline, type Vec2 } from '../terrain/path';
+import { resolvePads } from '../terrain/heightfield';
+import { meander, sampleSpline, tangentAngle, type Vec2 } from '../terrain/path';
+import type { BasinSpec, ChannelCut, PadSpec, ResolvedPad } from '../terrain/types';
 
-export type ChannelCut = {
-  id: string;
-  pts: Vec2[];
-  /** Half-width of the cut at grade, in world units. */
-  halfWidth: number;
-  /** Incision below surrounding grade, in world units. */
-  depth: number;
-};
-
-export type BasinSpec = {
-  id: string;
-  label: string;
-  center: Vec2;
-  radius: number;
-  depth: number;
-  /** How far in from the rim the floor flattens out. */
-  rimWidth: number;
-  /** Retention line height as a fraction of depth, measured from the floor. */
-  retentionFrac: number;
-};
+export type { BasinSpec, ChannelCut, PadSpec, ResolvedPad };
 
 /** Where the intake weir stands, at the head of the cut network. */
 export const HEADWORKS: Vec2 = { x: 0, z: -24 };
@@ -64,6 +47,23 @@ export const DENTIST_CHANNELS: ChannelCut[] = [
   cut('client-gate-run', [CLIENT_GATE, { x: -21, z: -5 }, { x: -16, z: -7 }, { x: -11, z: -8.4 }, { x: -2, z: -9 }], 0.6, 0.5, 103),
 ];
 
+/** The gated reach, named so gate placement can be derived from its geometry. */
+export const GATED_REACH = DENTIST_CHANNELS.find((c) => c.id === 'gated-reach')!;
+
+/**
+ * Sluice gates. Positions are authored; the angle is derived from the channel
+ * tangent, because the channel meanders procedurally and a hand-authored
+ * rotation silently goes stale the moment the meander seed changes. One gate
+ * was 26 degrees off perpendicular and spanned neither kerb.
+ */
+export const DENTIST_SLUICE_GATES = [
+  { id: 'consent', at: { x: -0.5, z: -20.5 }, width: 1.9 },
+  { id: 'naming', at: { x: 0.35, z: -15.5 }, width: 1.9 },
+].map((gate) => ({
+  ...gate,
+  angle: tangentAngle(GATED_REACH.pts, gate.at.x, gate.at.z),
+}));
+
 /**
  * Three platform pools at the same elevation — peers, no hierarchy (§3, §10.1)
  * — and the final pool below them. Retention fractions differ per pool: GA4
@@ -75,3 +75,58 @@ export const DENTIST_BASINS: BasinSpec[] = [
   { id: 'meta', label: 'Meta', center: { x: 13, z: 4 }, radius: 4.4, depth: 1.6, rimWidth: 1.4, retentionFrac: 0.55 },
   { id: 'final', label: 'The pool', center: { x: 0, z: 25 }, radius: 6.4, depth: 2.4, rimWidth: 2.0, retentionFrac: 0.2 },
 ];
+
+/**
+ * Levelled platforms under each built structure. Oriented rectangles, wide
+ * across the flow and narrow along it — a disc wide enough to span the
+ * 7.2-unit division lip would swallow its neighbours and flatten away the
+ * along-channel fall that makes water move downhill. Angles derive from the
+ * channel tangent, same as the sluice gates, so they stay correct if the
+ * meander seed changes.
+ */
+export const DENTIST_PAD_SPECS: PadSpec[] = [
+  {
+    id: 'headworks',
+    center: HEADWORKS,
+    angle: tangentAngle(GATED_REACH.pts, HEADWORKS.x, HEADWORKS.z),
+    halfWidth: 2.6,
+    halfLength: 0.7,
+    blend: 1.0,
+  },
+  {
+    id: 'sluice-consent',
+    center: { x: -0.5, z: -20.5 },
+    angle: tangentAngle(GATED_REACH.pts, -0.5, -20.5),
+    halfWidth: 1.4,
+    halfLength: 0.5,
+    blend: 0.7,
+  },
+  {
+    id: 'sluice-naming',
+    center: { x: 0.35, z: -15.5 },
+    angle: tangentAngle(GATED_REACH.pts, 0.35, -15.5),
+    halfWidth: 1.4,
+    halfLength: 0.5,
+    blend: 0.7,
+  },
+  {
+    id: 'division-lip',
+    center: DIVISION_LIP,
+    angle: tangentAngle(GATED_REACH.pts, DIVISION_LIP.x, DIVISION_LIP.z),
+    halfWidth: 4.0,
+    halfLength: 1.0,
+    blend: 1.4,
+  },
+  {
+    // Not on a channel — a wall across the boundary. Its angle matches the
+    // structure's own PI/2 rotation.
+    id: 'client-gate',
+    center: CLIENT_GATE,
+    angle: Math.PI / 2,
+    halfWidth: 6.0,
+    halfLength: 0.6,
+    blend: 1.5,
+  },
+];
+
+export const DENTIST_PADS = resolvePads(DENTIST_PAD_SPECS, DENTIST_CHANNELS, DENTIST_BASINS);

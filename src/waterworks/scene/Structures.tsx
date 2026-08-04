@@ -1,9 +1,17 @@
-import { CLIENT_GATE, DENTIST_BASINS, DENTIST_CHANNELS, DIVISION_LIP, HEADWORKS } from '../content/layout';
+import {
+  CLIENT_GATE,
+  DENTIST_BASINS,
+  DENTIST_CHANNELS,
+  DENTIST_PADS,
+  DENTIST_SLUICE_GATES,
+  DIVISION_LIP,
+  HEADWORKS,
+} from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
 import { WW_PALETTE } from '../tokens';
 
 function groundAt(x: number, z: number): number {
-  return carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS);
+  return carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
 }
 
 /** A timber board set in stone slots — the sluice of spec §5.1. */
@@ -90,8 +98,9 @@ export default function Structures() {
         </mesh>
       </group>
 
-      <SluiceGate x={-0.5} z={-20.5} width={1.9} angle={0.06} />
-      <SluiceGate x={0.35} z={-15.5} width={1.9} angle={-0.1} />
+      {DENTIST_SLUICE_GATES.map((gate) => (
+        <SluiceGate key={gate.id} x={gate.at.x} z={gate.at.z} width={gate.width} angle={gate.angle} />
+      ))}
 
       <DivisionLip />
       <ClientGate />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { DENTIST_BASINS, DENTIST_CHANNELS } from '../content/layout';
+import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
 import { WW_PALETTE } from '../tokens';
 
@@ -36,7 +36,7 @@ export default function Channels() {
           const off = cut.halfWidth * (0.92 + jitter * 0.22);
           const x = p.x + nx * side * off;
           const z = p.z + nz * side * off;
-          const y = carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS);
+          const y = carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
 
           q.setFromAxisAngle(up, angle + (jitter - 0.5) * 0.4);
           m.compose(

@@ -122,7 +122,7 @@ export function waterColor(t: number): [number, number, number] {
  * ribbon widen wherever the bank allows instead of holding one conservative
  * fraction everywhere. `waterHalfWidth` remains the model this searches
  * around: it sets both the outer bound and the fallback — the caller computes
- * it once per cross-section and passes it in as `estimate`, since it depends
+ * it once per channel and passes it in as `estimate`, since it depends
  * only on `cut` and both side-searches would otherwise repeat the same
  * 48-iteration bisection.
  *

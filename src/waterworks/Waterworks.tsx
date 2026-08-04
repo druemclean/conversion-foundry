@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { WW_PALETTE } from './tokens';
 import Camera, { OVERLOOK } from './scene/Camera';
 import Terrain from './scene/Terrain';
+import Channels from './scene/Channels';
+import Structures from './scene/Structures';
 import ViewSwitch from './ViewSwitch';
 import Effects from './scene/Effects';
 import Lights from './scene/Lights';
@@ -36,6 +38,8 @@ export default function Waterworks() {
           <Sky />
           <Lights />
           <Terrain />
+          <Channels />
+          <Structures />
           <Effects />
           <Camera />
         </Suspense>

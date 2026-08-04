@@ -7,6 +7,7 @@ import Terrain from './scene/Terrain';
 import Channels from './scene/Channels';
 import Structures from './scene/Structures';
 import ChannelWater from './scene/ChannelWater';
+import PoolWater from './scene/PoolWater';
 import Pools from './scene/Pools';
 import ViewSwitch from './ViewSwitch';
 import Effects from './scene/Effects';
@@ -51,6 +52,7 @@ export default function Waterworks() {
           <Channels />
           <Structures />
           <ChannelWater />
+          <PoolWater />
           <Pools />
           <Effects />
           <Camera />

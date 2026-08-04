@@ -8,8 +8,9 @@ import {
   waterHalfWidth,
 } from './water';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
-import { carvedGround, carvedHeight } from './heightfield';
+import { carvedGround, carvedHeight, srgbToLinear } from './heightfield';
 import { distanceToPolyline } from './path';
+import { WW_PALETTE } from '../tokens';
 
 const luma = (c: [number, number, number]) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
 
@@ -47,6 +48,30 @@ describe('waterColor', () => {
       const after = waterColor(Math.min(1, stop.at + 0.001));
       for (let k = 0; k < 3; k++) expect(Math.abs(after[k] - before[k])).toBeLessThan(0.02);
     }
+  });
+
+  it('outreads the soil it runs through, at the clear end', () => {
+    // §7 makes the colour grade the only chart in the piece. A ramp that is
+    // monotonic but sits below its background is a chart drawn in a colour
+    // you cannot see — which is what 0.130 → 0.232 against soil at 0.339 was.
+    const n = parseInt(WW_PALETTE.soilDry.slice(1), 16);
+    const soil = luma([
+      srgbToLinear(((n >> 16) & 255) / 255),
+      srgbToLinear(((n >> 8) & 255) / 255),
+      srgbToLinear((n & 255) / 255),
+    ]);
+    expect(luma(waterColor(1))).toBeGreaterThan(soil);
+    // And the muddy end must still read as darker than the bank, or there is
+    // no grade left to see.
+    expect(luma(waterColor(0))).toBeLessThan(soil * 0.65);
+  });
+
+  it('spreads far enough across the ramp to be legible', () => {
+    // Two-sided. Too narrow and the network reads as one flat tone; too wide
+    // and the rills go to black while the pool blows out.
+    const spread = luma(waterColor(1)) - luma(waterColor(0));
+    expect(spread).toBeGreaterThan(0.18);
+    expect(spread).toBeLessThan(0.4);
   });
 });
 

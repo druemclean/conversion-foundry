@@ -71,17 +71,19 @@ export type WaterStop = { at: number; rgb: [number, number, number] };
  * these are written into a vertex-colour attribute and Three reads those as
  * already linear — the same trap that made the terrain render too bright.
  *
- * The luminance spread across the ramp is doing the actual work. A first pass
- * ran 0.107 to 0.144, which is monotonic — the test passed — but far too
- * narrow to see: the whole network read as uniformly dark and the grade,
- * which §7 makes the only chart in the piece, said nothing. Roughly doubling
- * the top end is what makes "clearer with descent" legible without a legend.
+ * The luminance spread is doing the actual work, and it is measured against
+ * the *soil*, not against itself. A first pass ran 0.107 to 0.144: monotonic,
+ * so the test passed, and far too narrow to see. The second ran 0.130 to
+ * 0.232, which is a real spread but still sits under the 0.339 of the bank it
+ * runs through — so every channel read as a dark line whatever its geometry.
+ * The clear end now outreads the soil and the muddy end stays well under it,
+ * which is what makes "clearer with descent" legible without a legend.
  */
 export const WATER_STOPS: WaterStop[] = [
-  { at: 0.0, rgb: [0.19, 0.12, 0.052] },
-  { at: 0.38, rgb: [0.165, 0.155, 0.07] },
-  { at: 0.72, rgb: [0.13, 0.18, 0.185] },
-  { at: 1.0, rgb: [0.175, 0.245, 0.27] },
+  { at: 0.0, rgb: [0.235, 0.15, 0.062] },
+  { at: 0.38, rgb: [0.255, 0.245, 0.105] },
+  { at: 0.72, rgb: [0.23, 0.31, 0.32] },
+  { at: 1.0, rgb: [0.3, 0.395, 0.43] },
 ];
 
 /** Water colour at flow position `t`, clamped at both ends. */

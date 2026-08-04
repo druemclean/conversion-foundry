@@ -14,21 +14,25 @@ function floorOf(basin: BasinSpec): number {
  */
 function GaugePost({ basin }: { basin: BasinSpec }) {
   const floor = floorOf(basin);
-  const height = basin.depth + 1.5;
+  // Only enough freeboard to read a full pool. At depth + 1.5 these stood
+  // 3.6 units over a 2.1-deep basin and read as flagpoles.
+  const height = basin.depth + 0.5;
   const x = basin.center.x + basin.radius * 0.42;
   const z = basin.center.z + basin.radius * 0.3;
 
   return (
     <group position={[x, floor, z]}>
+      {/* A board, not a post — a staff gauge is a flat face you read across,
+          and a square section gave nothing to carry the graduations. */}
       <mesh castShadow receiveShadow position={[0, height / 2, 0]}>
-        <boxGeometry args={[0.16, height, 0.16]} />
+        <boxGeometry args={[0.3, height, 0.09]} />
         <meshStandardMaterial color={WW_PALETTE.timber} roughness={0.95} metalness={0} />
       </mesh>
       {/* Graduations, coarser near the top — real staff gauges are read from
           a distance and the fine marks are the ones that silt over. */}
       {Array.from({ length: 8 }, (_, i) => (
-        <mesh key={i} position={[0, 0.28 + i * (height - 0.4) / 8, 0.085]}>
-          <boxGeometry args={[i % 2 === 0 ? 0.16 : 0.1, 0.035, 0.012]} />
+        <mesh key={i} position={[0, 0.2 + (i * (height - 0.3)) / 8, 0.048]}>
+          <boxGeometry args={[i % 2 === 0 ? 0.3 : 0.18, 0.035, 0.012]} />
           <meshStandardMaterial color={WW_PALETTE.timberDark} roughness={0.9} metalness={0} />
         </mesh>
       ))}
@@ -41,22 +45,37 @@ function GaugePost({ basin }: { basin: BasinSpec }) {
  * marking the lowest point a side channel can reach. Different height per
  * pool, and the asymmetry is the lesson.
  */
+const STAIN_HEIGHT = 0.22;
+
 function RetentionStain({ basin }: { basin: BasinSpec }) {
   const floor = floorOf(basin);
   const y = floor + basin.depth * basin.retentionFrac;
 
+  // A band ON the wall, not a hoop lying in the basin. §10.1 warned that the
+  // four pool-wall marks only survive by differing in Kind — a surface, a
+  // standing post, a stain on stone, a deposit on the floor. Built as a flat
+  // horizontal ring this read as a second floor hovering above the silt, and
+  // two of the three dry marks collapsed into "a horizontal thing at a
+  // height". A cone frustum follows the sloping wall instead.
+  //
+  // The wall climbs `depth` over `rimWidth` of horizontal run, so the radius
+  // at any height is (radius - rimWidth) + rimWidth * fraction. Slight outward
+  // scale keeps the band clear of the terrain it sits against.
+  const wallRadius = basin.radius - basin.rimWidth + basin.rimWidth * basin.retentionFrac;
+  const flare = (basin.rimWidth * (STAIN_HEIGHT / 2)) / basin.depth;
+
   return (
-    <mesh position={[basin.center.x, y, basin.center.z]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[basin.radius - basin.rimWidth * 0.9, basin.radius - basin.rimWidth * 0.55, 64]} />
+    <mesh position={[basin.center.x, y, basin.center.z]}>
+      <cylinderGeometry
+        args={[(wallRadius + flare) * 1.006, (wallRadius - flare) * 1.006, STAIN_HEIGHT, 64, 1, true]}
+      />
       <meshStandardMaterial
         color={WW_PALETTE.retentionStain}
         roughness={1}
         metalness={0}
         transparent
-        opacity={0.72}
+        opacity={0.8}
         side={THREE.DoubleSide}
-        polygonOffset
-        polygonOffsetFactor={-2}
       />
     </mesh>
   );

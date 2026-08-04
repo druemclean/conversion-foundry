@@ -25,7 +25,13 @@ export default function Waterworks() {
           toneMapping: THREE.NoToneMapping,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
-        camera={{ position: OVERLOOK.position, fov: OVERLOOK.fov, near: 1, far: 400 }}
+        // far has to clear the sky dome, not just the terrain. The camera sits
+        // ~204 units from origin inside a 340-radius dome, so the backdrop's
+        // far wall is ~544 away — at far=400 the gradient was clipped entirely
+        // and all anyone saw was the flat scene.background behind it. near
+        // moves out to 5 to buy back the depth precision; the orbit controls
+        // never let the camera closer than 30.
+        camera={{ position: OVERLOOK.position, fov: OVERLOOK.fov, near: 5, far: 900 }}
         onCreated={({ scene }) => {
           scene.background = new THREE.Color(WW_PALETTE.skyLow);
           // Warm haze, not the Foundry's void. The camera sits ~200 units out,

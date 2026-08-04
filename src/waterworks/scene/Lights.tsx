@@ -5,17 +5,23 @@ import { WW_PALETTE } from '../tokens';
  * so channel cuts and weir faces throw long shadows and read as depth, plus
  * a strong sky/ground hemisphere doing the work the Foundry's emissives do.
  * No coloured rim lights — those are the Foundry's signature.
+ *
+ * Exposure is budgeted, not guessed. The soil albedos are decoded to linear
+ * (~0.45 for dry ochre), so total irradiance much above 1.0 pushes the red
+ * channel past white and ACES answers by desaturating — which is how the
+ * first pass turned warm ochre earth into pale grey. Sun plus hemisphere is
+ * held near 1.1 so #b39a70 survives tone mapping as the colour it is.
  */
 export default function Lights() {
   return (
     <>
       <hemisphereLight
-        args={[WW_PALETTE.skyHigh, WW_PALETTE.hemiGround, 1.35]}
+        args={[WW_PALETTE.skyHigh, WW_PALETTE.hemiGround, 0.6]}
         position={[0, 60, 0]}
       />
       <directionalLight
         position={[-52, 30, 34]}
-        intensity={2.2}
+        intensity={1.6}
         color={WW_PALETTE.sun}
         castShadow
         shadow-mapSize-width={4096}

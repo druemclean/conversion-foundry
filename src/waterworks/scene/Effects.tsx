@@ -20,7 +20,11 @@ export default function Effects() {
         samples={31}
         rings={4}
         radius={0.28}
-        intensity={6.5}
+        // Tuned down from 6.5, which was set against a much hotter light rig.
+        // Once exposure came back to a sane budget, that much occlusion turned
+        // every basin interior into a black hole — concave geometry gets hit
+        // twice, by the shadow and by SSAO on top of it.
+        intensity={3.4}
         luminanceInfluence={0.35}
         worldDistanceThreshold={200}
         worldDistanceFalloff={60}

@@ -18,9 +18,11 @@ export default function Channels() {
     const up = new THREE.Vector3(0, 1, 0);
 
     for (const cut of DENTIST_CHANNELS) {
-      // One kerb stone every ~3rd sample, alternating sides, so the edge is
-      // irregular — spec §7 forbids CAD-straight everything.
-      for (let i = 2; i < cut.pts.length - 2; i += 3) {
+      // One kerb stone every ~5th sample, alternating sides, so the edge is
+      // irregular — spec §7 forbids CAD-straight everything. Every 3rd was too
+      // dense: from the overlook the stones closed into a solid dotted chain
+      // and the channel stopped reading as a cut line at all.
+      for (let i = 2; i < cut.pts.length - 2; i += 5) {
         const p = cut.pts[i];
         const prev = cut.pts[i - 1];
         const next = cut.pts[i + 1];
@@ -42,10 +44,13 @@ export default function Channels() {
           m.compose(
             new THREE.Vector3(x, y + 0.06, z),
             q,
+            // ~60% of the first pass. These are kerb stones edging a cut, not
+            // boulders: at the old size they out-massed the channels they were
+            // supposed to be trimming.
             new THREE.Vector3(
-              cut.halfWidth * (0.5 + jitter * 0.3),
-              0.22 + jitter * 0.14,
-              cut.halfWidth * (0.9 + jitter * 0.5),
+              cut.halfWidth * (0.30 + jitter * 0.18),
+              0.13 + jitter * 0.08,
+              cut.halfWidth * (0.55 + jitter * 0.30),
             ),
           );
           matrices.push(m.clone());

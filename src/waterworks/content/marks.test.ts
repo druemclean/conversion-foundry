@@ -48,16 +48,65 @@ describe('the four pool-wall marks (spec §10.1)', () => {
 
   it('puts the retention band on the wall, not hanging in open water', () => {
     // Two-sided. The band must sit against the stone it marks: too far in and
-    // it is a bright hoop suspended in the pool (§10.1's "horizontal thing at a
-    // height" collapse); too far out and it is buried in the bank. Drawn at
-    // the old linear radius the wall is at the band's height to within 0.02 on
-    // Google Ads but 0.31 out on GA4, 0.23 on the final pool and 0.52 on Meta
-    // — a third of that basin's whole depth.
+    // it is a bright hoop suspended in the pool (§10.1's "horizontal thing at
+    // a height" collapse); too far out and it is buried in the bank.
+    //
+    // Judged over bearings, not along one. The band is a ring, so what matters
+    // is that it meets the wall around most of its circumference — and a
+    // single probe cannot tell you that, because the channels entering and
+    // leaving each basin breach the rim and send that bearing's reading
+    // anywhere. Sampling +x alone is also circular: it is the bearing the
+    // old implementation searched.
     for (const basin of DENTIST_BASINS) {
       const drawn = basinWallRadius(basin, basin.retentionFrac);
       const floor = carvedGround(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
-      const wall = carvedGround(basin.center.x + drawn, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
-      expect(Math.abs(wall - (floor + basin.depth * basin.retentionFrac))).toBeLessThan(0.05);
+      const target = floor + basin.depth * basin.retentionFrac;
+
+      const errors: number[] = [];
+      for (let k = 0; k < 24; k++) {
+        const angle = (k / 24) * Math.PI * 2;
+        const h = carvedGround(
+          basin.center.x + Math.cos(angle) * drawn,
+          basin.center.z + Math.sin(angle) * drawn,
+          DENTIST_CHANNELS,
+          DENTIST_BASINS,
+        );
+        errors.push(Math.abs(h - target));
+      }
+      errors.sort((p, q) => p - q);
+
+      // Absolute sanity bound. It is loose on purpose: a circular band at one
+      // radius cannot sit flush on a wall whose height varies with bearing,
+      // and around these basins the surrounding grade varies by more than the
+      // band is tall. Median error by basin is GA4 0.180, Ads 0.143, Meta
+      // 0.357, final 0.044 — Meta is the worst because its ground is the most
+      // irregular, and no choice of radius fixes that.
+      expect(errors[12]).toBeLessThan(0.45);
+
+      // The assertion that actually earns its place: measuring the wall must
+      // never be materially worse than the straight-line model it replaced.
+      // That model assumed the wall climbs linearly from floor to rim, but
+      // `carvedGround` blends the floor in with a smoothstep — worth 0.19 on
+      // the final pool, most of a band height. Without this bound the search
+      // could silently degrade back past the model and still look measured.
+      const linear = basin.radius - basin.rimWidth + basin.rimWidth * basin.retentionFrac;
+      const modelErrors: number[] = [];
+      for (let k = 0; k < 24; k++) {
+        const angle = (k / 24) * Math.PI * 2;
+        const h = carvedGround(
+          basin.center.x + Math.cos(angle) * linear,
+          basin.center.z + Math.sin(angle) * linear,
+          DENTIST_CHANNELS,
+          DENTIST_BASINS,
+        );
+        modelErrors.push(Math.abs(h - target));
+      }
+      modelErrors.sort((p, q) => p - q);
+      // Margin, not equality: the tightest basin (Ads) sits 0.016 the good
+      // side of the model, and the terrain underneath is still being worked
+      // on. A bound this close to zero would flake on unrelated changes
+      // while catching nothing a 0.05 bound misses.
+      expect(errors[12]).toBeLessThan(modelErrors[12] + 0.05);
       // And it lands on the sloping rim, not on the flat floor inside it nor
       // out on the hillside beyond the lip.
       expect(drawn).toBeGreaterThan(basin.radius - basin.rimWidth);

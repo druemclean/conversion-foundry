@@ -173,16 +173,41 @@ export const DENTIST_PADS = resolvePads(DENTIST_PAD_SPECS, DENTIST_CHANNELS, DEN
 export function basinWallRadius(basin: BasinSpec, heightFrac: number): number {
   const floor = carvedGround(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
   const target = floor + basin.depth * heightFrac;
-  // Sample along +x from the centre; the basin carve is radially symmetric.
-  let lo = 0;
-  let hi = basin.radius;
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2;
-    const h = carvedGround(basin.center.x + mid, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
-    if (h < target) lo = mid;
-    else hi = mid;
+
+  // Measured over bearings and reduced to the median, NOT sampled along one.
+  // The basin carve is radially symmetric but the ground it is cut into is
+  // not: every basin has channels entering and leaving, and they breach its
+  // rim. On Meta the per-bearing radius spans 2.6 units, with the worst
+  // bearing running 1.7 past the lip following a channel out. A single probe
+  // reads whatever that one bearing happens to cross — a +x probe put Meta's
+  // wall 0.18 inside its true line, which is worse than the straight-line
+  // model it replaced.
+  const bearings = 24;
+  const radii: number[] = [];
+
+  for (let k = 0; k < bearings; k++) {
+    const angle = (k / bearings) * Math.PI * 2;
+    const dx = Math.cos(angle);
+    const dz = Math.sin(angle);
+
+    let lo = 0;
+    let hi = basin.radius;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      const h = carvedGround(
+        basin.center.x + dx * mid,
+        basin.center.z + dz * mid,
+        DENTIST_CHANNELS,
+        DENTIST_BASINS,
+      );
+      if (h < target) lo = mid;
+      else hi = mid;
+    }
+    radii.push((lo + hi) / 2);
   }
-  return (lo + hi) / 2;
+
+  radii.sort((a, b) => a - b);
+  return (radii[(bearings - 1) >> 1] + radii[bearings >> 1]) / 2;
 }
 
 /** Named so the structures standing on them can share their orientation. */

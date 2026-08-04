@@ -105,6 +105,51 @@ export function waterColor(t: number): [number, number, number] {
 }
 
 /**
+ * The largest radius on one side of a cross-section at which the ground is
+ * still below the water plane — the real waterline, measured rather than
+ * modelled.
+ *
+ * An analytic width cannot do this job. At this fill the idealised cut
+ * profile leaves the ribbon edge only `depth * 0.056` below the bank — about
+ * 0.03 units on these channels — while the terrain's micro-relief runs to
+ * ±0.2. Measured, that made every edge a coin flip: mean margins of 0.01 to
+ * 0.05 against tenth-percentile margins of -0.07 to -0.24, and half of all
+ * ribbon edges came out buried in the bank they were supposed to sit inside.
+ *
+ * Searching the surface makes the edge correct by construction, and lets the
+ * ribbon widen wherever the bank allows instead of holding one conservative
+ * fraction everywhere. `waterHalfWidth` remains the model this searches
+ * around: it sets both the outer bound and the fallback — the caller computes
+ * it once per cross-section and passes it in as `estimate`, since it depends
+ * only on `cut` and both side-searches would otherwise repeat the same
+ * 48-iteration bisection.
+ *
+ * `nx`/`nz` arrive already signed for the side being measured.
+ */
+function waterlineRadius(
+  cut: ChannelCut,
+  px: number,
+  pz: number,
+  nx: number,
+  nz: number,
+  y: number,
+  estimate: number,
+  groundAt: (x: number, z: number) => number,
+): number {
+  const outer = Math.min(cut.halfWidth * 0.97, estimate * 1.4);
+  const inner = estimate * 0.45;
+  const steps = 14;
+
+  // Walk inward from the outer bound and take the first radius that is
+  // genuinely wet, so the ribbon is as wide as the ground actually permits.
+  for (let i = 0; i <= steps; i++) {
+    const r = outer + ((inner - outer) * i) / steps;
+    if (groundAt(px + nx * r, pz + nz * r) < y - WATER_SURFACE.edgeClearance) return r;
+  }
+  return inner;
+}
+
+/**
  * A water surface following a channel centreline.
  *
  * Water is placed by *fill level*, not by offset from the ground: one level
@@ -135,49 +180,6 @@ export function waterColor(t: number): [number, number, number] {
  *
  * Returns typed arrays rather than geometry so this stays testable in Node.
  */
-
-/**
- * The largest radius on one side of a cross-section at which the ground is
- * still below the water plane — the real waterline, measured rather than
- * modelled.
- *
- * An analytic width cannot do this job. At this fill the idealised cut
- * profile leaves the ribbon edge only `depth * 0.056` below the bank — about
- * 0.03 units on these channels — while the terrain's micro-relief runs to
- * ±0.2. Measured, that made every edge a coin flip: mean margins of 0.01 to
- * 0.05 against tenth-percentile margins of -0.07 to -0.24, and half of all
- * ribbon edges came out buried in the bank they were supposed to sit inside.
- *
- * Searching the surface makes the edge correct by construction, and lets the
- * ribbon widen wherever the bank allows instead of holding one conservative
- * fraction everywhere. `waterHalfWidth` remains the model this searches
- * around: it sets both the outer bound and the fallback.
- *
- * `nx`/`nz` arrive already signed for the side being measured.
- */
-function waterlineRadius(
-  cut: ChannelCut,
-  px: number,
-  pz: number,
-  nx: number,
-  nz: number,
-  y: number,
-  groundAt: (x: number, z: number) => number,
-): number {
-  const estimate = waterHalfWidth(cut);
-  const outer = Math.min(cut.halfWidth * 0.97, estimate * 1.4);
-  const inner = estimate * 0.45;
-  const steps = 14;
-
-  // Walk inward from the outer bound and take the first radius that is
-  // genuinely wet, so the ribbon is as wide as the ground actually permits.
-  for (let i = 0; i <= steps; i++) {
-    const r = outer + ((inner - outer) * i) / steps;
-    if (groundAt(px + nx * r, pz + nz * r) < y - WATER_SURFACE.edgeClearance) return r;
-  }
-  return inner;
-}
-
 export function buildChannelRibbon(
   cut: ChannelCut,
   groundAt: (x: number, z: number) => number,
@@ -193,6 +195,11 @@ export function buildChannelRibbon(
   const uvs = new Float32Array(n * 2 * 2);
   const colors = new Float32Array(n * 2 * 3);
   const indices = new Uint32Array((n - 1) * 6);
+
+  // Depends only on `cut`, so hoisted out of the per-side, per-cross-section
+  // calls into `waterlineRadius` below instead of recomputing it — each call
+  // runs a 48-iteration bisection.
+  const halfWidthEstimate = waterHalfWidth(cut);
 
   let run = 0;
 
@@ -234,7 +241,7 @@ export function buildChannelRibbon(
       // at different heights, so a single shared half-width would bury one
       // edge to keep the other wet. The surface stays level regardless — `y`
       // is computed once per cross-section, above.
-      const r = waterlineRadius(cut, p.x, p.z, nx * sign, nz * sign, y, groundAt);
+      const r = waterlineRadius(cut, p.x, p.z, nx * sign, nz * sign, y, halfWidthEstimate, groundAt);
       const x = p.x + nx * sign * r;
       const z = p.z + nz * sign * r;
 

@@ -125,14 +125,16 @@ describe('buildChannelRibbon', () => {
     // of metres downslope, which is what a bank is for.
     let counted = 0;
     const total = ribbon.positions.length / 6;
-    for (let i = 0; i < ribbon.positions.length; i += 6) {
-      const y = ribbon.positions[i + 1];
-      // The centreline lies midway between the two bank vertices.
-      const cx = (ribbon.positions[i] + ribbon.positions[i + 3]) / 2;
-      const cz = (ribbon.positions[i + 2] + ribbon.positions[i + 5]) / 2;
-      if (insideBasin(cx, cz) || atJunction(cut, cx, cz)) continue;
+    for (let s = 0; s < cut.pts.length; s++) {
+      const p = cut.pts[s];
+      const y = ribbon.positions[s * 6 + 1];
+      // Each side searches for its own waterline, so the midpoint of the two
+      // bank vertices is NOT the centreline. `cut.pts[s]` is the point the
+      // ribbon itself sampled for `bed`, which makes this exact rather than
+      // approximate.
+      if (insideBasin(p.x, p.z) || atJunction(cut, p.x, p.z)) continue;
       counted++;
-      const standing = y - groundAt(cx, cz);
+      const standing = y - groundAt(p.x, p.z);
 
       expect(standing).toBeGreaterThan(cut.depth * 0.4);
       expect(standing).toBeLessThanOrEqual(cut.depth + 1e-6);

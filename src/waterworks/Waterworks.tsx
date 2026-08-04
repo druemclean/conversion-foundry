@@ -5,6 +5,9 @@ import { WW_PALETTE } from './tokens';
 import Camera, { OVERLOOK } from './scene/Camera';
 import Terrain from './scene/Terrain';
 import ViewSwitch from './ViewSwitch';
+import Effects from './scene/Effects';
+import Lights from './scene/Lights';
+import Sky from './scene/Sky';
 
 export default function Waterworks() {
   return (
@@ -22,11 +25,16 @@ export default function Waterworks() {
         camera={{ position: OVERLOOK.position, fov: OVERLOOK.fov, near: 1, far: 400 }}
         onCreated={({ scene }) => {
           scene.background = new THREE.Color(WW_PALETTE.skyLow);
+          // Warm haze, not the Foundry's void — distance should read as dusty
+          // air over a valley, so the far ridge softens instead of vanishing.
+          scene.fog = new THREE.Fog(WW_PALETTE.haze, 150, 340);
         }}
       >
         <Suspense fallback={null}>
-          <ambientLight intensity={1.2} />
+          <Sky />
+          <Lights />
           <Terrain />
+          <Effects />
           <Camera />
         </Suspense>
       </Canvas>

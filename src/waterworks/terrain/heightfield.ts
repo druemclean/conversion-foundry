@@ -42,11 +42,28 @@ export function crossSlope(x: number): number {
   return Math.pow(Math.abs(x) / TERRAIN.xMax, 2.2) * 7;
 }
 
-/** Undisturbed ground — before anything was cut into it. */
+/**
+ * Undisturbed ground — before anything was cut into it.
+ *
+ * The noise fades to zero over the last few units to the tile boundary. The
+ * surround samples that boundary every 5 units and draws straight lines
+ * between samples; the tile samples it every 0.4 units. Noise on the boundary
+ * makes the two edges disagree between shared samples — wherever the tile's
+ * edge crested above the surround's straight edge, a sliver of bright sky
+ * showed through, tracing the outline. A noise-free edge is nearly linear, so
+ * the surround's coarse interpolation matches it to centimetres.
+ */
 export function surfaceHeight(x: number, z: number): number {
   const macro = fbm2D(x * 0.035, z * 0.035, TERRAIN.seed, 4);
   const micro = fbm2D(x * 0.22, z * 0.22, TERRAIN.seed + 7, 3);
-  return baseFall(z) + crossSlope(x) + (macro - 0.5) * 3.2 + (micro - 0.5) * 0.45;
+  const toEdge = Math.min(
+    x - TERRAIN.xMin,
+    TERRAIN.xMax - x,
+    z - TERRAIN.zMin,
+    TERRAIN.zMax - z,
+  );
+  const noise = smoothstep(0, 4, toEdge);
+  return baseFall(z) + crossSlope(x) + ((macro - 0.5) * 3.2 + (micro - 0.5) * 0.45) * noise;
 }
 
 /**
@@ -165,10 +182,14 @@ export const SURROUND = {
   zMax: 320,
   /** Coarse — this is country seen from 200+ units away and mostly hazed. */
   res: 5,
-  /** Inner hole, deliberately inside the worked tile so the two overlap. */
-  holeX: 28,
-  holeZMin: -38,
-  holeZMax: 38,
+  /** Inner hole. The margin to the tile edge must exceed one full cell
+   *  (res), because buildSurroundGrid drops any cell with a corner in the
+   *  hole: at the old 2-unit margin every candidate cell had an in-hole
+   *  corner, the whole overlap ring vanished, and the T-junctions along the
+   *  bare seam opened pinhole cracks with the sky behind them. */
+  holeX: 24,
+  holeZMin: -34,
+  holeZMax: 34,
   /** Kept at zero: a real height step, however small, left a lit hairline
    *  tracing the tile's outline. Separation is done with polygonOffset on the
    *  surround's material instead, which biases depth without moving geometry. */
@@ -197,7 +218,17 @@ export function surroundHeight(x: number, z: number): number {
   const edge = surfaceHeight(ex, ez);
 
   const out = Math.hypot(x - ex, z - ez);
-  if (out === 0) return edge;
+  if (out === 0) {
+    // Inside the tile footprint: the overlap band. Meet the boundary exactly,
+    // then duck below the worked ground — deeper than the deepest cut — so
+    // the band backs the seam's T-junction pinholes with earth while never
+    // poking through a channel or basin carved near the edge.
+    const inward = Math.min(
+      TERRAIN.xMax - Math.abs(x),
+      Math.min(z - TERRAIN.zMin, TERRAIN.zMax - z),
+    );
+    return edge - smoothstep(0, 4, inward) * 4;
+  }
 
   // Continue the way the land was already going, read as a one-sided gradient
   // from inside the tile. A uniform roll-away was wrong on three sides: it
@@ -260,6 +291,95 @@ export function buildSurroundGrid(): {
   }
 
   return { positions, indices: new Uint32Array(tris), nx, nz };
+}
+
+/**
+ * Analytic per-vertex normals for the surround, from the height function's
+ * central differences rather than the mesh's faces.
+ *
+ * computeVertexNormals averages the faces touching a vertex, and the vertices
+ * on the hole's rim only have faces on their outward side — the same one-sided
+ * average the worked tile dodges with its guard ring. The resulting tilt
+ * caught the key light and drew a bright hairline tracing the tile's outline.
+ * Differentiating surroundHeight directly gives every vertex the true surface
+ * normal no matter what the mesh topology does around it.
+ */
+export function buildSurroundNormals(positions: Float32Array): Float32Array {
+  const normals = new Float32Array(positions.length);
+  const eps = 0.25;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i];
+    const z = positions[i + 2];
+    const dhdx = (surroundHeight(x + eps, z) - surroundHeight(x - eps, z)) / (2 * eps);
+    const dhdz = (surroundHeight(x, z + eps) - surroundHeight(x, z - eps)) / (2 * eps);
+    const len = Math.hypot(dhdx, 1, dhdz);
+    normals[i] = -dhdx / len;
+    normals[i + 1] = 1 / len;
+    normals[i + 2] = -dhdz / len;
+  }
+  return normals;
+}
+
+/** How far the tile's edge curtain hangs below the carved ground. */
+export const SKIRT_DEPTH = 6;
+
+/**
+ * A vertical curtain hanging from the worked tile's perimeter.
+ *
+ * The tile and the surround meet only along the boundary curve — the corner
+ * test in buildSurroundGrid eats the intended overlap ring, because the hole
+ * margin (2 units) is smaller than a surround cell (5 units). The tile samples
+ * that curve every 0.4 units through noisy ground; the surround interpolates
+ * straight lines between 5-unit samples. Between shared points the two edges
+ * disagree by the sub-sample noise, opening slivers with the sky behind them —
+ * a lit hairline tracing the whole outline. Restoring real overlap is not an
+ * option: the intake cut reaches the tile edge, and undisturbed surround
+ * inside the tile would dam it. The skirt closes the seam from the tile's
+ * side instead — any crack now shows earth, not sky.
+ *
+ * Walks the perimeter as a closed loop at terrain resolution, emitting a top
+ * vertex on the carved edge and a bottom vertex SKIRT_DEPTH below it.
+ */
+export function buildSkirt(height: (x: number, z: number) => number): {
+  positions: Float32Array;
+  indices: Uint32Array;
+} {
+  const sx = Math.round((TERRAIN.xMax - TERRAIN.xMin) / TERRAIN.res);
+  const sz = Math.round((TERRAIN.zMax - TERRAIN.zMin) / TERRAIN.res);
+
+  const loop: [number, number][] = [];
+  for (let i = 0; i < sx; i++) loop.push([TERRAIN.xMin + i * TERRAIN.res, TERRAIN.zMin]);
+  for (let i = 0; i < sz; i++) loop.push([TERRAIN.xMax, TERRAIN.zMin + i * TERRAIN.res]);
+  for (let i = 0; i < sx; i++) loop.push([TERRAIN.xMax - i * TERRAIN.res, TERRAIN.zMax]);
+  for (let i = 0; i < sz; i++) loop.push([TERRAIN.xMin, TERRAIN.zMax - i * TERRAIN.res]);
+
+  const positions = new Float32Array(loop.length * 2 * 3);
+  const indices = new Uint32Array(loop.length * 6);
+
+  loop.forEach(([x, z], i) => {
+    const top = height(x, z);
+    const p = i * 6;
+    positions[p] = x;
+    positions[p + 1] = top;
+    positions[p + 2] = z;
+    positions[p + 3] = x;
+    positions[p + 4] = top - SKIRT_DEPTH;
+    positions[p + 5] = z;
+
+    const a = i * 2; // top
+    const b = a + 1; // bottom
+    const c = ((i + 1) % loop.length) * 2; // next top
+    const d = c + 1; // next bottom
+    const t = i * 6;
+    indices[t] = a;
+    indices[t + 1] = b;
+    indices[t + 2] = c;
+    indices[t + 3] = c;
+    indices[t + 4] = b;
+    indices[t + 5] = d;
+  });
+
+  return { positions, indices };
 }
 
 /**

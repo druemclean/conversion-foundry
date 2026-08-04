@@ -1,6 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { SURROUND, buildSurroundGrid, buildTerrainColors, surroundHeight } from '../terrain/heightfield';
+import {
+  SURROUND,
+  buildSurroundGrid,
+  buildSurroundNormals,
+  buildTerrainColors,
+  surroundHeight,
+} from '../terrain/heightfield';
 
 /**
  * The country the hillside sits in.
@@ -21,8 +27,12 @@ export default function Surround() {
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // Analytic normals, not computeVertexNormals: the hole-rim vertices only
+    // have faces on their outward side, and the one-sided average tilted their
+    // normals into the key light — a lit white hairline traced the worked
+    // tile's outline against the sky.
+    geom.setAttribute('normal', new THREE.BufferAttribute(buildSurroundNormals(positions), 3));
     geom.setIndex(new THREE.BufferAttribute(indices, 1));
-    geom.computeVertexNormals();
     geom.computeBoundingSphere();
     return geom;
   }, []);

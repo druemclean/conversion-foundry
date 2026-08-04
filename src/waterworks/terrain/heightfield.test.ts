@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SKIRT_DEPTH,
   SURROUND,
+  buildSkirt,
   buildSurroundGrid,
+  buildSurroundNormals,
   surroundHeight,
   baseFall,
   buildTerrainColors,
@@ -10,6 +13,7 @@ import {
   carvedHeight,
   channelIncision,
   clamp01,
+  crossSlope,
   resolvePads,
   smoothstep,
   srgbToLinear,
@@ -352,10 +356,14 @@ describe('surroundHeight', () => {
     }
   });
 
-  it('is identical to the tile everywhere inside it', () => {
+  it('stays at or below the tile surface everywhere inside it', () => {
+    // Inside the footprint the surround is the overlap band backing the seam.
+    // It must never rise above the worked ground (it would poke through), and
+    // away from the boundary it ducks well below the deepest cut.
     for (let x = -25; x <= 25; x += 10) {
       for (let z = -35; z <= 35; z += 10) {
-        expect(surroundHeight(x, z)).toBeCloseTo(surfaceHeight(x, z), 9);
+        expect(surroundHeight(x, z)).toBeLessThanOrEqual(surfaceHeight(x, z) + 1e-9);
+        expect(surroundHeight(x, z)).toBeGreaterThan(surfaceHeight(x, z) - 4.001);
       }
     }
   });
@@ -430,15 +438,169 @@ describe('buildSurroundGrid', () => {
     }
   });
 
-  it('overlaps the worked tile rather than butting against it', () => {
-    // The hole is smaller than the tile, so the two meshes share a band and
-    // cannot open a crack between them at any resolution mismatch. Which of
-    // the two wins that band is settled by polygonOffset on the surround's
-    // material, not by geometry — a real height step, however small, left a
-    // lit hairline tracing the tile's outline.
-    expect(SURROUND.holeX).toBeLessThan(TERRAIN.xMax);
-    expect(SURROUND.holeZMin).toBeGreaterThan(TERRAIN.zMin);
-    expect(SURROUND.holeZMax).toBeLessThan(TERRAIN.zMax);
+  it('emits a true overlap band inside the tile footprint', () => {
+    // Cells are dropped when ANY corner is in the hole, so the hole margin
+    // must exceed one full cell or the corner test eats the entire overlap
+    // ring — which is exactly what happened at a 2-unit margin: the meshes
+    // met only along the boundary curve, and the T-junctions between the
+    // tile's 0.4-unit edge vertices and the surround's 5-unit edge spans
+    // opened pinhole cracks with the sky behind them. Height agreement cannot
+    // fix a T-junction; only geometry behind it can.
+    expect(TERRAIN.xMax - SURROUND.holeX).toBeGreaterThan(SURROUND.res);
+    expect(SURROUND.holeZMin - TERRAIN.zMin).toBeGreaterThan(SURROUND.res);
+    expect(TERRAIN.zMax - SURROUND.holeZMax).toBeGreaterThan(SURROUND.res);
+
+    let inside = 0;
+    for (let t = 0; t < grid.indices.length; t += 3) {
+      for (let k = 0; k < 3; k++) {
+        const v = grid.indices[t + k] * 3;
+        const x = grid.positions[v];
+        const z = grid.positions[v + 2];
+        if (Math.abs(x) < TERRAIN.xMax && z > TERRAIN.zMin && z < TERRAIN.zMax) inside++;
+      }
+    }
+    expect(inside).toBeGreaterThan(0);
     expect(SURROUND.drop).toBe(0);
+  });
+
+  it('dips below the worked ground inside the tile so cuts stay open', () => {
+    // The overlap band must never poke through a channel or basin carved near
+    // the tile edge (the intake cut reaches the boundary). Inside the tile
+    // footprint the surround therefore hugs a level below the undisturbed
+    // surface, deeper than the deepest cut, while still meeting the boundary
+    // exactly.
+    for (const [x, z] of [
+      [27.5, 0],
+      [-27.5, 10],
+      [0, -37.5],
+      [10, 37.5],
+    ] as const) {
+      const inward = Math.min(
+        TERRAIN.xMax - Math.abs(x),
+        Math.min(z - TERRAIN.zMin, TERRAIN.zMax - z),
+      );
+      expect(inward).toBeGreaterThan(0);
+      expect(surroundHeight(x, z)).toBeLessThan(surfaceHeight(x, z) - 2.5);
+    }
+    // And exactly at the boundary the two surfaces still agree.
+    expect(surroundHeight(TERRAIN.xMax, 0)).toBeCloseTo(surfaceHeight(TERRAIN.xMax, 0), 9);
+    expect(surroundHeight(0, TERRAIN.zMin)).toBeCloseTo(surfaceHeight(0, TERRAIN.zMin), 9);
+  });
+});
+
+describe('surfaceHeight edge fade', () => {
+  it('carries no noise on the tile boundary', () => {
+    // The surround samples this boundary every 5 units and draws straight
+    // lines between; the tile samples it every 0.4 through the noise. Any
+    // noise on the boundary makes the two edges disagree between shared
+    // samples, opening backlit slivers of sky along the seam. So the noise
+    // must be fully faded by the time it reaches the edge.
+    for (let z = TERRAIN.zMin; z <= TERRAIN.zMax; z += 7.3) {
+      expect(surfaceHeight(TERRAIN.xMin, z)).toBeCloseTo(baseFall(z) + crossSlope(TERRAIN.xMin), 9);
+      expect(surfaceHeight(TERRAIN.xMax, z)).toBeCloseTo(baseFall(z) + crossSlope(TERRAIN.xMax), 9);
+    }
+    for (let x = TERRAIN.xMin; x <= TERRAIN.xMax; x += 5.9) {
+      expect(surfaceHeight(x, TERRAIN.zMin)).toBeCloseTo(baseFall(TERRAIN.zMin) + crossSlope(x), 9);
+      expect(surfaceHeight(x, TERRAIN.zMax)).toBeCloseTo(baseFall(TERRAIN.zMax) + crossSlope(x), 9);
+    }
+  });
+
+  it('keeps full noise in the interior', () => {
+    const noise = Math.abs(surfaceHeight(0, 0) - (baseFall(0) + crossSlope(0)));
+    expect(noise).toBeGreaterThan(0.01);
+  });
+
+  it('lets the surround edge interpolation match the tile edge between samples', () => {
+    // The surround grid samples the boundary at multiples of its 5-unit res.
+    // Halfway between two such samples, its straight edge must sit within a
+    // whisker of the tile's own edge height, or the seam reopens.
+    for (let x0 = -30; x0 < 30; x0 += 5) {
+      const a = surroundHeight(x0, TERRAIN.zMin);
+      const b = surroundHeight(x0 + 5, TERRAIN.zMin);
+      const mid = surfaceHeight(x0 + 2.5, TERRAIN.zMin);
+      expect(Math.abs((a + b) / 2 - mid)).toBeLessThan(0.1);
+    }
+  });
+});
+
+describe('buildSurroundNormals', () => {
+  const grid = buildSurroundGrid();
+  const normals = buildSurroundNormals(grid.positions);
+
+  it('emits one unit normal per vertex', () => {
+    expect(normals.length).toBe(grid.positions.length);
+    for (let i = 0; i < normals.length; i += 3) {
+      const len = Math.hypot(normals[i], normals[i + 1], normals[i + 2]);
+      expect(len).toBeCloseTo(1, 5);
+      // A heightfield's surface normal always points up, never sideways-only.
+      expect(normals[i + 1]).toBeGreaterThan(0);
+    }
+  });
+
+  it('matches the analytic gradient of surroundHeight at hole-edge vertices', () => {
+    // The whole point: edge vertices must carry the true surface normal, not
+    // the tilted average computeVertexNormals produces from one-sided faces —
+    // that tilt caught the key light and lit a white hairline tracing the
+    // worked tile's outline.
+    const eps = 0.25;
+    for (let i = 0; i < grid.positions.length; i += 3) {
+      const x = grid.positions[i];
+      const z = grid.positions[i + 2];
+      if (Math.abs(Math.abs(x) - 30) > 1e-6 && Math.abs(Math.abs(z) - 40) > 1e-6) continue;
+      const dhdx = (surroundHeight(x + eps, z) - surroundHeight(x - eps, z)) / (2 * eps);
+      const dhdz = (surroundHeight(x, z + eps) - surroundHeight(x, z - eps)) / (2 * eps);
+      const len = Math.hypot(dhdx, 1, dhdz);
+      expect(normals[i]).toBeCloseTo(-dhdx / len, 3);
+      expect(normals[i + 1]).toBeCloseTo(1 / len, 3);
+      expect(normals[i + 2]).toBeCloseTo(-dhdz / len, 3);
+    }
+  });
+});
+
+describe('buildSkirt', () => {
+  const height = (x: number, z: number) =>
+    carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
+  const skirt = buildSkirt(height);
+
+  it('walks the full tile perimeter at terrain resolution', () => {
+    const perimeterSteps =
+      2 *
+      (Math.round((TERRAIN.xMax - TERRAIN.xMin) / TERRAIN.res) +
+        Math.round((TERRAIN.zMax - TERRAIN.zMin) / TERRAIN.res));
+    // Two vertices (top and bottom) per perimeter point, closed loop.
+    expect(skirt.positions.length).toBe(perimeterSteps * 2 * 3);
+    // Two triangles per perimeter segment.
+    expect(skirt.indices.length).toBe(perimeterSteps * 6);
+  });
+
+  it('keeps every vertex on the tile boundary', () => {
+    for (let i = 0; i < skirt.positions.length; i += 3) {
+      const x = skirt.positions[i];
+      const z = skirt.positions[i + 2];
+      const onX = Math.abs(Math.abs(x) - TERRAIN.xMax) < 1e-9;
+      const onZ =
+        Math.abs(z - TERRAIN.zMin) < 1e-9 || Math.abs(z - TERRAIN.zMax) < 1e-9;
+      expect(onX || onZ).toBe(true);
+    }
+  });
+
+  it('hangs from the carved edge down by exactly the skirt depth', () => {
+    // Vertices alternate top, bottom for each perimeter point.
+    for (let i = 0; i < skirt.positions.length; i += 6) {
+      const x = skirt.positions[i];
+      const top = skirt.positions[i + 1];
+      const z = skirt.positions[i + 2];
+      const bottom = skirt.positions[i + 4];
+      // Positions round-trip through Float32, which keeps ~7 significant
+      // digits — on ~20-unit heights that is 1e-5, not double precision.
+      expect(top).toBeCloseTo(height(x, z), 4);
+      expect(bottom).toBeCloseTo(top - SKIRT_DEPTH, 4);
+    }
+  });
+
+  it('keeps every index in range and whole triangles only', () => {
+    expect(skirt.indices.length % 3).toBe(0);
+    const maxIndex = skirt.positions.length / 3 - 1;
+    for (const idx of skirt.indices) expect(idx).toBeLessThanOrEqual(maxIndex);
   });
 });

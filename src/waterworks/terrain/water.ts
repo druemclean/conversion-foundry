@@ -1,5 +1,66 @@
 import type { ChannelCut } from './types';
 
+/**
+ * Tuning for both water surfaces, kept here rather than in the R3F
+ * components so a Node test can assert against them. `terrain/` imports no
+ * Three.js — that boundary is why any of this is testable.
+ */
+export const WATER_SURFACE = {
+  /** Fraction of a channel's depth that the running water fills. */
+  channelFill: 0.85,
+  /**
+   * Pulls the ribbon inside the true waterline. The edge then always has
+   * ground below it; drawn at the waterline exactly, it would graze the bank
+   * and re-bury itself wherever the terrain's micro-noise ran high.
+   */
+  widthSafety: 0.94,
+  /** Water may never come closer than this to the rim of its own cut. */
+  freeboard: 0.05,
+  /** Water always stands at least this far above its own bed. */
+  bedClearance: 0.02,
+
+  channelOpacity: 0.88,
+  channelRoughness: 0.2,
+
+  /**
+   * Spec §5.4 puts the retention line and the silt below the waterline by
+   * definition, and §10.1 needs both readable. At 0.9 the pools were opaque
+   * and two of the four pool-wall marks rendered to nothing.
+   */
+  poolOpacity: 0.58,
+  poolRoughness: 0.12,
+} as const;
+
+/**
+ * Inverse of the cut profile `channelIncision` uses — `smoothstep(halfWidth,
+ * 0, d)`, in units of half-width. Returns the distance from the centreline at
+ * which the cut has removed `fraction` of its full depth: 0 at the deepest
+ * point, 1 at the lip.
+ *
+ * Bisection rather than the closed form. Smoothstep's cubic inverts to a
+ * trigonometric expression that is easy to get subtly wrong, and this runs
+ * eleven times at module load — the clarity is worth more than the cycles.
+ */
+export function incisionRadius(fraction: number): number {
+  const target = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 48; i++) {
+    const mid = (lo + hi) / 2;
+    const t = 1 - mid;
+    const profile = t * t * (3 - 2 * t);
+    // The profile falls as `mid` grows, so still-too-deep means go outward.
+    if (profile > target) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Half-width of the water surface in a filled channel, in world units. */
+export function waterHalfWidth(cut: ChannelCut): number {
+  return cut.halfWidth * incisionRadius(1 - WATER_SURFACE.channelFill) * WATER_SURFACE.widthSafety;
+}
+
 export type WaterStop = { at: number; rgb: [number, number, number] };
 
 /**

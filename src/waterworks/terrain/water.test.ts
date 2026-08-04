@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { WATER_STOPS, buildChannelRibbon, waterColor } from './water';
+import {
+  WATER_STOPS,
+  WATER_SURFACE,
+  buildChannelRibbon,
+  incisionRadius,
+  waterColor,
+  waterHalfWidth,
+} from './water';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
 import { carvedHeight } from './heightfield';
 
@@ -111,5 +118,67 @@ describe('buildChannelRibbon', () => {
     // have no cross-channel coordinate at all.
     expect(ribbon.uvs[0]).toBe(0);
     expect(ribbon.uvs[2]).toBe(1);
+  });
+});
+
+describe('incisionRadius', () => {
+  // The profile carvedGround cuts is depth * smoothstep(halfWidth, 0, d).
+  // incisionRadius inverts it: given a fraction of full depth, how far out
+  // from the centreline has the cut removed exactly that much?
+  const profile = (d: number) => {
+    const t = 1 - d;
+    return t * t * (3 - 2 * t);
+  };
+
+  it('pins the ends of the profile', () => {
+    // Full depth at the centreline, nothing at the lip.
+    expect(incisionRadius(1)).toBeCloseTo(0, 6);
+    expect(incisionRadius(0)).toBeCloseTo(1, 6);
+  });
+
+  it('round-trips against the profile it inverts', () => {
+    for (const fraction of [0.05, 0.12, 0.15, 0.3, 0.5, 0.75, 0.9]) {
+      expect(profile(incisionRadius(fraction))).toBeCloseTo(fraction, 5);
+    }
+  });
+
+  it('moves outward as less depth is asked for', () => {
+    // A shallower slice of the cut is a wider one. If this inverted, every
+    // channel's water would be narrowest when the channel was fullest.
+    let prev = Infinity;
+    for (let f = 0.05; f <= 0.95; f += 0.05) {
+      const r = incisionRadius(f);
+      expect(r).toBeLessThan(prev);
+      prev = r;
+    }
+  });
+
+  it('clamps outside 0..1 instead of extrapolating', () => {
+    expect(incisionRadius(-2)).toBeCloseTo(incisionRadius(0), 6);
+    expect(incisionRadius(4)).toBeCloseTo(incisionRadius(1), 6);
+  });
+});
+
+describe('waterHalfWidth', () => {
+  const cut = DENTIST_CHANNELS.find((c) => c.id === 'gated-reach')!;
+
+  it('stays inside the cut it fills', () => {
+    expect(waterHalfWidth(cut)).toBeLessThan(cut.halfWidth);
+  });
+
+  it('is wide enough to see', () => {
+    // Two-sided on purpose. The upper bound above stops it flooding the
+    // hillside; without this lower bound a one-pixel thread would pass, and
+    // a thread is what the overlook was already showing.
+    expect(waterHalfWidth(cut)).toBeGreaterThan(cut.halfWidth * 0.6);
+  });
+
+  it('sits inside the true waterline, so its edge has ground beneath it', () => {
+    // The waterline is where the cut's own profile meets the fill level. Draw
+    // the ribbon any wider than that and its edge is buried in the bank —
+    // which is exactly the failure this plan exists to fix.
+    const waterline = cut.halfWidth * incisionRadius(1 - WATER_SURFACE.channelFill);
+    expect(waterHalfWidth(cut)).toBeLessThan(waterline);
+    expect(waterHalfWidth(cut)).toBeGreaterThan(waterline * 0.85);
   });
 });

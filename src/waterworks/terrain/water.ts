@@ -6,18 +6,38 @@ import type { ChannelCut } from './types';
  * Three.js — that boundary is why any of this is testable.
  */
 export const WATER_SURFACE = {
-  /** Fraction of a channel's depth that the running water fills. */
+  /**
+   * Fraction of a channel's depth that the running water fills.
+   *
+   * Rarely the binding term, so it is rarely the right knob. Of 351
+   * cross-sections, 110 (31%) are set by this, 185 (53%) by the rim guard and
+   * 56 (16%) by `bedClearance` — anyone raising or lowering the water level
+   * should reach for `freeboard` first.
+   */
   channelFill: 0.85,
   /**
-   * Pulls the ribbon inside the true waterline. The edge then always has
-   * ground below it; drawn at the waterline exactly, it would graze the bank
-   * and re-bury itself wherever the terrain's micro-noise ran high.
+   * Lower bound on the measured waterline search — it scales `waterHalfWidth`,
+   * which sets the search's inner bound and its fallback.
+   *
+   * It does *not* set the drawn edge, and it no longer sets the outer bound
+   * either: `waterHalfWidth` returns `halfWidth * incisionRadius(0.15) * 0.94
+   * = halfWidth * 0.71026`, so the `estimate * 1.4` outer candidate is
+   * `halfWidth * 0.99437` and the `halfWidth * 0.97` cap always wins. Keeping
+   * the ribbon's edge over ground is the measured search's job now, not this
+   * constant's.
    */
   widthSafety: 0.94,
   /** Water may never come closer than this to the rim of its own cut. */
   freeboard: 0.05,
-  /** Water always stands at least this far above its own bed. */
-  bedClearance: 0.02,
+  /**
+   * Water always stands at least this far above its own bed — and far enough
+   * above it to clear the terrain's own tessellation error. The tile is
+   * sampled every 0.4 units against a smoothstep over a 0.6 half-width, so a
+   * grid node can sit ~0.1 above the true bed. At the old 0.02 a clamped
+   * section was inside that error and z-fought the ground it stood on, which
+   * is the artefact this whole pass exists to remove.
+   */
+  bedClearance: 0.14,
   /** How far under the water plane a ribbon edge must sit to count as wet. */
   edgeClearance: 0.01,
 
@@ -121,10 +141,12 @@ export function waterColor(t: number): [number, number, number] {
  * Searching the surface makes the edge correct by construction, and lets the
  * ribbon widen wherever the bank allows instead of holding one conservative
  * fraction everywhere. `waterHalfWidth` remains the model this searches
- * around: it sets both the outer bound and the fallback — the caller computes
- * it once per channel and passes it in as `estimate`, since it depends
- * only on `cut` and both side-searches would otherwise repeat the same
- * 48-iteration bisection.
+ * around, but only at the inner end: it sets the innermost search step and
+ * the fallback. The outer bound is always `cut.halfWidth * 0.97`, because
+ * `estimate * 1.4` works out to `cut.halfWidth * 0.99437` on every channel and
+ * the cap wins. The caller computes the estimate once per channel and passes
+ * it in, since it depends only on `cut` and both side-searches would otherwise
+ * repeat the same 48-iteration bisection.
  *
  * `nx`/`nz` arrive already signed for the side being measured.
  */
@@ -167,18 +189,21 @@ function waterlineRadius(
  * Two samplers, not one, because they answer different questions:
  * - `groundAt` is the real rendered surface — pads included — and is what the
  *   water actually rests on (`bed`).
- * - `bankAt` is the excavated ground *without* structure pads, and is what the
- *   rim guard checks against. A pad is a levelled building platform:
- *   `resolvePads` sets `pad.level = carvedGround(centre)`, which for a pad
- *   sitting on a channel centreline is the channel bed itself, and every pad's
- *   footprint is wider than the cut it sits on. Guarding against `groundAt`
- *   at the rim would read that flattened bed back at the rim sample and
- *   conclude "no banks here" at exactly the four places a viewer looks
- *   hardest — the intake weir, both sluice gates, and the division lip —
- *   pinning the water to `bedClearance` right at each structure. `bankAt`
- *   still respects real excavation, so junction cuts and basin mouths still
- *   lower the guard correctly; it just isn't fooled by a building sitting on
- *   top of the ground.
+ * - `bankAt` is the excavated ground *without* structure pads. A pad is a
+ *   levelled building platform: `resolvePads` sets
+ *   `pad.level = carvedGround(centre)`, which for a pad sitting on a channel
+ *   centreline is the channel bed itself, and every pad's footprint is wider
+ *   than the cut it sits on. Guarding against `groundAt` alone at the rim
+ *   would read that flattened bed back at the rim sample and conclude "no
+ *   banks here" at exactly the four places a viewer looks hardest — the
+ *   intake weir, both sluice gates, and the division lip — pinning the water
+ *   to `bedClearance` right at each structure. `bankAt` still respects real
+ *   excavation, so junction cuts and basin mouths still lower the guard
+ *   correctly; it just isn't fooled by a building sitting on top of the
+ *   ground.
+ *
+ * The rim guard takes the *higher* of the two, so neither sampler's blind
+ * spot survives — see the comment at `rimA`/`rimB`.
  *
  * Returns typed arrays rather than geometry so this stays testable in Node.
  */
@@ -224,10 +249,24 @@ export function buildChannelRibbon(
     // The rim is sampled at the cut's full half-width, where the incision
     // profile has returned to grade. Sampling at the ribbon's edge instead
     // would read ground that is below the water by design and drag the
-    // surface straight back down to the bed. Sampled against `bankAt`
-    // (excavation only, no pads) — see the doc comment above.
-    const rimA = bankAt(p.x + nx * cut.halfWidth, p.z + nz * cut.halfWidth);
-    const rimB = bankAt(p.x - nx * cut.halfWidth, p.z - nz * cut.halfWidth);
+    // surface straight back down to the bed.
+    //
+    // The bank is the higher of what was *excavated* and what is *actually
+    // there*, because the two samplers fail in opposite directions and each
+    // covers the other's case. Where a pad flattens ground down onto the bed
+    // — the intake weir, both sluices, the division lip — `bankAt` is the
+    // higher and wins, so the guard is not fooled into "no banks here" at the
+    // four places a viewer looks hardest. Where a pad *raises* ground, it is
+    // `groundAt` that is higher and wins: the client-gate pad takes its level
+    // at CLIENT_GATE and its 6-unit footprint runs downslope along
+    // client-gate-run, lifting the bed above the unpadded ground the guard
+    // was measured on. Guarding on `bankAt` alone pinned the water there to
+    // 0.020 standing between neighbours at 0.279 and 0.313 — a visible notch,
+    // and thin enough to z-fight the terrain.
+    const rimA = Math.max(bankAt(p.x + nx * cut.halfWidth, p.z + nz * cut.halfWidth),
+                          groundAt(p.x + nx * cut.halfWidth, p.z + nz * cut.halfWidth));
+    const rimB = Math.max(bankAt(p.x - nx * cut.halfWidth, p.z - nz * cut.halfWidth),
+                          groundAt(p.x - nx * cut.halfWidth, p.z - nz * cut.halfWidth));
     const guard = Math.min(rimA, rimB) - WATER_SURFACE.freeboard;
     // The bed clearance wins over the rim guard, which matters at a channel
     // mouth: there the rim samples land inside the pond and sit below the

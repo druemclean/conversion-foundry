@@ -4,6 +4,7 @@ import {
   DENTIST_CHANNELS,
   DENTIST_PADS,
   RETENTION_STAIN_HEIGHT,
+  basinWallRadius,
   type BasinSpec,
 } from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
@@ -62,10 +63,13 @@ function RetentionStain({ basin }: { basin: BasinSpec }) {
   // two of the three dry marks collapsed into "a horizontal thing at a
   // height". A cone frustum follows the sloping wall instead.
   //
-  // The wall climbs `depth` over `rimWidth` of horizontal run, so the radius
-  // at any height is (radius - rimWidth) + rimWidth * fraction. Slight outward
-  // scale keeps the band clear of the terrain it sits against.
-  const wallRadius = basin.radius - basin.rimWidth + basin.rimWidth * basin.retentionFrac;
+  // Where the wall actually reaches this height, measured — the same move
+  // `waterlineRadius` makes for the channels. Modelled as a straight line from
+  // floor to rim, the radius was out by up to 0.23 and the wall it landed on
+  // by up to 0.52 in height; under a 0.58-opacity pool that is a bright hoop
+  // hanging in open water. Slight outward scale keeps the band clear of the
+  // terrain it sits against.
+  const wallRadius = basinWallRadius(basin, basin.retentionFrac);
   const flare = (basin.rimWidth * (RETENTION_STAIN_HEIGHT / 2)) / basin.depth;
 
   return (

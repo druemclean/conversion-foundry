@@ -1,4 +1,4 @@
-import { resolvePads } from '../terrain/heightfield';
+import { carvedGround, resolvePads } from '../terrain/heightfield';
 import { meander, sampleSpline, tangentAngle, type Vec2 } from '../terrain/path';
 import type { BasinSpec, ChannelCut, PadSpec, ResolvedPad } from '../terrain/types';
 
@@ -152,6 +152,38 @@ export const DENTIST_PAD_SPECS: PadSpec[] = [
 ];
 
 export const DENTIST_PADS = resolvePads(DENTIST_PAD_SPECS, DENTIST_CHANNELS, DENTIST_BASINS);
+
+/**
+ * The radius at which a basin's wall actually reaches a given fraction of its
+ * depth.
+ *
+ * `Pools.tsx` used to model this as a straight line from floor to rim, but
+ * `carvedGround` blends the floor in with a smoothstep and the hillside is
+ * not level across the basin, so the real wall is nowhere near the modelled
+ * line — 0.23 outside it on GA4, 0.19 inside it on Meta, 0.17 outside on the
+ * final pool, which puts the modelled radius 0.31, 0.52 and 0.23 adrift of
+ * the wall in height. Drawn there the retention band hangs in open water, or
+ * sinks into the bank, instead of marking the stone — the "horizontal thing
+ * at a height" failure §10.1 warns about.
+ *
+ * Bisection against the real surface, once per basin at module load. Samples
+ * `carvedGround`, not `carvedHeight`: the basin wall is excavation, and no pad
+ * sits on a basin.
+ */
+export function basinWallRadius(basin: BasinSpec, heightFrac: number): number {
+  const floor = carvedGround(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
+  const target = floor + basin.depth * heightFrac;
+  // Sample along +x from the centre; the basin carve is radially symmetric.
+  let lo = 0;
+  let hi = basin.radius;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const h = carvedGround(basin.center.x + mid, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
+    if (h < target) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
 
 /** Named so the structures standing on them can share their orientation. */
 export const HEADWORKS_PAD = DENTIST_PADS.find((p) => p.id === 'headworks')!;

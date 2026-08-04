@@ -107,6 +107,30 @@ describe('buildChannelRibbon', () => {
       (other) => other.id !== cut.id && distanceToPolyline(x, z, other.pts) <= other.halfWidth,
     );
 
+  /**
+   * The same two exclusions, applied at the centreline *and* at the two points
+   * the rim guard actually samples — one cut half-width either side, on the
+   * same normal `buildChannelRibbon` uses. A cross-section whose centreline is
+   * in open ground can still have a rim sample sitting in a neighbouring cut,
+   * and there the guard is as inoperative as if the centreline were.
+   */
+  const excludedSection = (cut: (typeof DENTIST_CHANNELS)[number], i: number) => {
+    const n = cut.pts.length;
+    const p = cut.pts[i];
+    const prev = cut.pts[Math.max(0, i - 1)];
+    const next = cut.pts[Math.min(n - 1, i + 1)];
+    const dx = next.x - prev.x;
+    const dz = next.z - prev.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = (-dz / len) * cut.halfWidth;
+    const nz = (dx / len) * cut.halfWidth;
+    return [
+      [p.x, p.z],
+      [p.x + nx, p.z + nz],
+      [p.x - nx, p.z - nz],
+    ].some(([x, z]) => insideBasin(x, z) || atJunction(cut, x, z));
+  };
+
   it('emits two vertices per centreline sample', () => {
     expect(ribbon.positions.length).toBe(cut.pts.length * 2 * 3);
   });
@@ -134,6 +158,43 @@ describe('buildChannelRibbon', () => {
     const firstY = ribbon.positions[1];
     const lastY = ribbon.positions[ribbon.positions.length - 2];
     expect(lastY).toBeLessThan(firstY);
+  });
+
+  it('runs downhill step by step, not just end to end', () => {
+    // Endpoint-only is the same shape of assertion as the one that let the
+    // buried ribbon through: a wildly non-monotonic surface passes as long as
+    // its two ends are ordered. Measured, six channels have steps rising by
+    // up to 0.67 — all of them where the water sits on a pond floor and
+    // climbs out of the mouth, which is inside the exclusions below and under
+    // the pool disc regardless.
+    //
+    // The exclusion is applied at the rim samples as well as at the
+    // centreline, because the rim samples are what the guard actually reads.
+    // Where they land in a neighbouring cut the guard is inoperative for the
+    // same reason `atJunction` exists — and that is not hypothetical: on
+    // to-ga4 the two sections either side of client-gate-run's tail, 0.53
+    // outside its cut, step up 0.117 while their bed rises only 0.034.
+    //
+    // What survives is the bed itself: 0.045 at rill-centre's head, where the
+    // noise fade towards the tile boundary ramps in, and up to 0.039 on
+    // to-meta, which climbs the valley's cross-slope faster than it falls down
+    // the valley. The water follows the ground it lies in; the tolerance is
+    // sized for that, not for anything the fill logic does.
+    for (const c of DENTIST_CHANNELS) {
+      const r = buildChannelRibbon(c, groundAt, bankAt);
+      const n = c.pts.length;
+      let counted = 0;
+      for (let s = 1; s < n; s++) {
+        if (excludedSection(c, s) || excludedSection(c, s - 1)) continue;
+        counted++;
+        const rise = r.positions[s * 6 + 1] - r.positions[(s - 1) * 6 + 1];
+        expect(rise).toBeLessThan(0.05);
+      }
+      // Two-sided: the exclusion must not be allowed to excuse a whole
+      // channel. If a filter can drop every awkward step, the bar above it
+      // means nothing.
+      expect(counted).toBeGreaterThan((n - 1) * 0.35);
+    }
   });
 
   it('keeps every cross-section level', () => {
@@ -200,6 +261,40 @@ describe('buildChannelRibbon', () => {
       // means nothing.
       expect(counted).toBeGreaterThan(total * 0.35);
       expect(exposed / counted).toBeGreaterThan(0.95);
+    }
+  });
+
+  it('stands deep enough to see in every channel, not just the gated reach', () => {
+    // The magnitude bar, applied across all eleven cuts. `shows water at the
+    // surface everywhere the channel has banks` only asks that `y` beat the
+    // ground, which a two-centimetre film satisfies — and a two-centimetre
+    // film is exactly what the client-gate pad produced downstream of the
+    // gate (0.020 on a 0.5-deep cut, 0.04 of its depth) while that suite
+    // stayed green. Worse than invisible: below the terrain's own 0.4-unit
+    // tessellation error, so it z-fought the ground it stood on.
+    //
+    // Stated as a fraction of each cut's own depth, because the eleven cuts
+    // run 0.45 to 0.85 deep and one absolute number would be vacuous on the
+    // gated reach and unreachable on a draw-off. Measured per-channel minima
+    // run 0.28 (client-gate-run, where the pad flattens bed and rim together
+    // so the level falls back to `bedClearance`) and 0.36 (to-meta, climbing
+    // the valley's cross-slope) to 0.83; every other channel clears 0.63.
+    for (const c of DENTIST_CHANNELS) {
+      const r = buildChannelRibbon(c, groundAt, bankAt);
+      let counted = 0;
+      const total = c.pts.length;
+      for (let s = 0; s < c.pts.length; s++) {
+        const p = c.pts[s];
+        if (insideBasin(p.x, p.z) || atJunction(c, p.x, p.z)) continue;
+        counted++;
+        const standing = r.positions[s * 6 + 1] - groundAt(p.x, p.z);
+        expect(standing).toBeGreaterThan(c.depth * 0.25);
+        expect(standing).toBeLessThanOrEqual(c.depth + 1e-6);
+      }
+      // Two-sided: the exclusion must not be allowed to excuse a whole
+      // channel. If a filter can drop every awkward sample, the bar above it
+      // means nothing.
+      expect(counted).toBeGreaterThan(total * 0.35);
     }
   });
 
@@ -275,10 +370,17 @@ describe('waterHalfWidth', () => {
     expect(waterHalfWidth(cut)).toBeGreaterThan(cut.halfWidth * 0.6);
   });
 
-  it('sits inside the true waterline, so its edge has ground beneath it', () => {
-    // The waterline is where the cut's own profile meets the fill level. Draw
-    // the ribbon any wider than that and its edge is buried in the bank —
-    // which is exactly the failure this plan exists to fix.
+  it('keeps the waterline search bracketed inside the analytic waterline', () => {
+    // This constrains the *estimate*, not the drawn edge. The estimate sets
+    // the search's inner bound and its fallback, so it has to sit inside the
+    // analytic waterline — where the cut's own profile meets the fill level —
+    // or a fallback would place the edge in the bank.
+    //
+    // The drawn edge is deliberately not held to this: the measured search
+    // proved the analytic waterline over-conservative, and the shipped ribbon
+    // on this channel runs 0.742 to 1.116 half-width against an analytic
+    // waterline of 0.869. Lower bound because a search bracketed far too tight
+    // would never widen at all.
     const waterline = cut.halfWidth * incisionRadius(1 - WATER_SURFACE.channelFill);
     expect(waterHalfWidth(cut)).toBeLessThan(waterline);
     expect(waterHalfWidth(cut)).toBeGreaterThan(waterline * 0.85);

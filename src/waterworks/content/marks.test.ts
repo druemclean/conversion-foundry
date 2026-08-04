@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DENTIST_BASINS, RETENTION_STAIN_HEIGHT } from './layout';
+import {
+  DENTIST_BASINS,
+  DENTIST_CHANNELS,
+  RETENTION_STAIN_HEIGHT,
+  basinWallRadius,
+} from './layout';
 import { WW_PALETTE } from '../tokens';
-import { linearFromHex } from '../terrain/heightfield';
+import { carvedGround, linearFromHex } from '../terrain/heightfield';
 import { WATER_SURFACE } from '../terrain/water';
 
 const luma = (c: [number, number, number]) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
@@ -39,6 +44,25 @@ describe('the four pool-wall marks (spec §10.1)', () => {
     const frac = (id: string) => DENTIST_BASINS.find((b) => b.id === id)!.retentionFrac;
     expect(frac('ga4')).toBeLessThan(frac('ads'));
     expect(frac('ads')).toBeLessThan(frac('meta'));
+  });
+
+  it('puts the retention band on the wall, not hanging in open water', () => {
+    // Two-sided. The band must sit against the stone it marks: too far in and
+    // it is a bright hoop suspended in the pool (§10.1's "horizontal thing at a
+    // height" collapse); too far out and it is buried in the bank. Drawn at
+    // the old linear radius the wall is at the band's height to within 0.02 on
+    // Google Ads but 0.31 out on GA4, 0.23 on the final pool and 0.52 on Meta
+    // — a third of that basin's whole depth.
+    for (const basin of DENTIST_BASINS) {
+      const drawn = basinWallRadius(basin, basin.retentionFrac);
+      const floor = carvedGround(basin.center.x, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
+      const wall = carvedGround(basin.center.x + drawn, basin.center.z, DENTIST_CHANNELS, DENTIST_BASINS);
+      expect(Math.abs(wall - (floor + basin.depth * basin.retentionFrac))).toBeLessThan(0.05);
+      // And it lands on the sloping rim, not on the flat floor inside it nor
+      // out on the hillside beyond the lip.
+      expect(drawn).toBeGreaterThan(basin.radius - basin.rimWidth);
+      expect(drawn).toBeLessThan(basin.radius);
+    }
   });
 
   it('makes the retention line a different tone from the stone it marks', () => {

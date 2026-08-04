@@ -145,6 +145,9 @@ describe('carvedGround', () => {
 });
 
 describe('pads', () => {
+  // This is also the overlap guard. Two platforms at two different levels
+  // cannot both be true at a point, and it was this assertion that caught the
+  // original disc-shaped pads overlapping each other.
   it('levels the ground flat across each pad', () => {
     for (const pad of DENTIST_PADS) {
       const heights: number[] = [];
@@ -195,16 +198,24 @@ describe('pads', () => {
     }
   });
 
-  it('keeps every pad core clear of every other pad core', () => {
-    // Two platforms at two different levels cannot both be true at a point.
-    // The disc-shaped pads this replaced overlapped and un-levelled each other.
-    for (const a of DENTIST_PADS) {
-      for (const b of DENTIST_PADS) {
-        if (a.id === b.id) continue;
-        const gap = Math.hypot(a.center.x - b.center.x, a.center.z - b.center.z);
-        const reachA = Math.hypot(a.halfWidth, a.halfLength) + a.blend;
-        const reachB = Math.hypot(b.halfWidth, b.halfLength) + b.blend;
-        expect(gap).toBeGreaterThan(Math.min(reachA, reachB));
+  it('gives every pad enough flat ground for the structure it carries', () => {
+    for (const pad of DENTIST_PADS) {
+      // The flat core must cover the structure's own footprint.
+      expect(pad.halfWidth).toBeGreaterThanOrEqual(pad.carries.halfWidth);
+      expect(pad.halfLength).toBeGreaterThanOrEqual(pad.carries.halfLength);
+
+      // And no corner of that footprint may sit high enough to bury it.
+      const cos = Math.cos(pad.angle);
+      const sin = Math.sin(pad.angle);
+      for (const sx of [-1, 0, 1]) {
+        for (const sz of [-1, 0, 1]) {
+          const lx = sx * pad.carries.halfWidth;
+          const lz = sz * pad.carries.halfLength;
+          const x = pad.center.x + lx * cos + lz * sin;
+          const z = pad.center.z - lx * sin + lz * cos;
+          const ground = carvedHeight(x, z, DENTIST_CHANNELS, DENTIST_BASINS, DENTIST_PADS);
+          expect(ground - pad.level).toBeLessThan(pad.carries.height);
+        }
       }
     }
   });

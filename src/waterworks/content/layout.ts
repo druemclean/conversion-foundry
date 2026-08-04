@@ -92,6 +92,7 @@ export const DENTIST_PAD_SPECS: PadSpec[] = [
     halfWidth: 2.6,
     halfLength: 0.7,
     blend: 1.0,
+    carries: { halfWidth: 2.2, halfLength: 0.35, height: 0.6 },
   },
   {
     id: 'sluice-consent',
@@ -100,6 +101,7 @@ export const DENTIST_PAD_SPECS: PadSpec[] = [
     halfWidth: 1.4,
     halfLength: 0.5,
     blend: 0.7,
+    carries: { halfWidth: 1.21, halfLength: 0.21, height: 0.84 },
   },
   {
     id: 'sluice-naming',
@@ -108,6 +110,7 @@ export const DENTIST_PAD_SPECS: PadSpec[] = [
     halfWidth: 1.4,
     halfLength: 0.5,
     blend: 0.7,
+    carries: { halfWidth: 1.21, halfLength: 0.21, height: 0.84 },
   },
   {
     id: 'division-lip',
@@ -116,6 +119,7 @@ export const DENTIST_PAD_SPECS: PadSpec[] = [
     halfWidth: 4.0,
     halfLength: 1.0,
     blend: 1.4,
+    carries: { halfWidth: 3.6, halfLength: 0.53, height: 0.44 },
   },
   {
     // Not on a channel — a wall across the boundary. Its angle matches the
@@ -126,7 +130,12 @@ export const DENTIST_PAD_SPECS: PadSpec[] = [
     halfWidth: 6.0,
     halfLength: 0.6,
     blend: 1.5,
+    carries: { halfWidth: 5.7, halfLength: 0.28, height: 0.9 },
   },
 ];
 
 export const DENTIST_PADS = resolvePads(DENTIST_PAD_SPECS, DENTIST_CHANNELS, DENTIST_BASINS);
+
+/** Named so the structures standing on them can share their orientation. */
+export const HEADWORKS_PAD = DENTIST_PADS.find((p) => p.id === 'headworks')!;
+export const DIVISION_LIP_PAD = DENTIST_PADS.find((p) => p.id === 'division-lip')!;

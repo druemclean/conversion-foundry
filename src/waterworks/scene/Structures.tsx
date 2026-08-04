@@ -5,7 +5,9 @@ import {
   DENTIST_PADS,
   DENTIST_SLUICE_GATES,
   DIVISION_LIP,
+  DIVISION_LIP_PAD,
   HEADWORKS,
+  HEADWORKS_PAD,
 } from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
 import { WW_PALETTE } from '../tokens';
@@ -41,7 +43,7 @@ function SluiceGate({ x, z, width, angle }: { x: number; z: number; width: numbe
 function DivisionLip() {
   const y = groundAt(DIVISION_LIP.x, DIVISION_LIP.z);
   return (
-    <group position={[DIVISION_LIP.x, y, DIVISION_LIP.z]}>
+    <group position={[DIVISION_LIP.x, y, DIVISION_LIP.z]} rotation={[0, DIVISION_LIP_PAD.angle, 0]}>
       <mesh castShadow receiveShadow position={[0, 0.22, 0]}>
         <boxGeometry args={[7.2, 0.44, 0.9]} />
         <meshStandardMaterial color={WW_PALETTE.rock} roughness={0.88} metalness={0} />
@@ -86,7 +88,7 @@ export default function Structures() {
   return (
     <group>
       {/* The intake weir — first thing built, hardest to move later (§3). */}
-      <group position={[HEADWORKS.x, intakeY, HEADWORKS.z]}>
+      <group position={[HEADWORKS.x, intakeY, HEADWORKS.z]} rotation={[0, HEADWORKS_PAD.angle, 0]}>
         <mesh castShadow receiveShadow position={[0, 0.3, 0]}>
           <boxGeometry args={[4.4, 0.6, 0.7]} />
           <meshStandardMaterial color={WW_PALETTE.rockWet} roughness={0.9} metalness={0} />

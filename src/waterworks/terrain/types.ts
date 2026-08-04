@@ -34,6 +34,12 @@ export type PadSpec = {
   halfLength: number;
   /** Graded batter back to surrounding ground, beyond the flat core. */
   blend: number;
+  /**
+   * Footprint and height of the structure this pad carries, in the pad's own
+   * local frame. Declared so a test can prove the pad is big enough — without
+   * it, shrinking a pad silently re-buries its structure.
+   */
+  carries: { halfWidth: number; halfLength: number; height: number };
 };
 
 /** A PadSpec with its height resolved against the un-padded terrain. */

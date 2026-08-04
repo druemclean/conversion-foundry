@@ -6,6 +6,7 @@ import {
   carvedHeight,
   clamp01,
   smoothstep,
+  srgbToLinear,
   surfaceHeight,
   TERRAIN,
 } from './heightfield';
@@ -135,5 +136,35 @@ describe('buildTerrainColors', () => {
 
     const luma = (c: Float32Array) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
     expect(luma(cutColor)).toBeLessThan(luma(gradeColor));
+  });
+});
+
+describe('srgbToLinear', () => {
+  it('pins both ends of the range', () => {
+    expect(srgbToLinear(0)).toBeCloseTo(0, 10);
+    expect(srgbToLinear(1)).toBeCloseTo(1, 10);
+  });
+
+  it('matches the known mid-grey value', () => {
+    expect(srgbToLinear(0.5)).toBeCloseTo(0.2140, 4);
+  });
+
+  it('uses the linear segment below the knee', () => {
+    expect(srgbToLinear(0.04)).toBeCloseTo(0.04 / 12.92, 10);
+  });
+
+  it('darkens every mid-tone, which is the whole point of the decode', () => {
+    for (const s of [0.2, 0.4, 0.6, 0.8]) {
+      expect(srgbToLinear(s)).toBeLessThan(s);
+    }
+  });
+
+  it('is monotonically increasing', () => {
+    let prev = -1;
+    for (let s = 0; s <= 1; s += 0.05) {
+      const v = srgbToLinear(s);
+      expect(v).toBeGreaterThan(prev);
+      prev = v;
+    }
   });
 });

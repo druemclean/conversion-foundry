@@ -1,4 +1,5 @@
 import type { BasinSpec, ChannelCut } from '../content/layout';
+import { WW_PALETTE } from '../tokens';
 import { fbm2D } from './noise';
 import { distanceToPolyline } from './path';
 
@@ -49,9 +50,10 @@ export function surfaceHeight(x: number, z: number): number {
 }
 
 /**
- * Ground after the basins were dug and the channels cut. Basins first, then
- * channels, so a draw-off entering a pool cuts through the rim rather than
- * being buried by it.
+ * Ground after the basins were dug and the channels cut. Both basin and
+ * channel incisions are subtracted from undisturbed grade; the order between
+ * the two loops doesn't affect the result, since neither term reads the
+ * running height `h` — each only depends on (x, z) and static geometry.
  */
 export function carvedHeight(
   x: number,
@@ -125,11 +127,28 @@ function lerp3(a: [number, number, number], b: [number, number, number], t: numb
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-// Linear-space albedos matching WW_PALETTE.soilDry / soilDamp / silt / moss.
-const SOIL_DRY: [number, number, number] = [0.7, 0.6, 0.44];
-const SOIL_DAMP: [number, number, number] = [0.49, 0.39, 0.27];
-const SILT: [number, number, number] = [0.42, 0.35, 0.25];
-const MOSS: [number, number, number] = [0.42, 0.48, 0.29];
+/** sRGB → linear-sRGB transfer function, per IEC 61966-2-1. */
+export function srgbToLinear(channel: number): number {
+  return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+}
+
+/** Decode a '#rrggbb' palette entry into a linear-space RGB triple. */
+function linearFromHex(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [
+    srgbToLinear(((n >> 16) & 255) / 255),
+    srgbToLinear(((n >> 8) & 255) / 255),
+    srgbToLinear((n & 255) / 255),
+  ];
+}
+
+// Linear-space albedos, decoded from the sRGB palette. Three.js does not
+// colour-manage raw vertex-colour attributes — it reads them as linear — so
+// the decode has to happen here or the terrain renders too bright.
+const SOIL_DRY = linearFromHex(WW_PALETTE.soilDry);
+const SOIL_DAMP = linearFromHex(WW_PALETTE.soilDamp);
+const SILT = linearFromHex(WW_PALETTE.silt);
+const MOSS = linearFromHex(WW_PALETTE.moss);
 
 /**
  * Per-vertex soil colour. Dampness is inferred from how far a vertex sits

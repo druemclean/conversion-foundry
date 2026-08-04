@@ -209,11 +209,14 @@ The bug. `buildChannelRibbon` sets each bank vertex to `Math.min(bed, height(x, 
 
 **Files:**
 - Modify: `src/waterworks/terrain/water.ts:54-126` (the `buildChannelRibbon` function)
+- Modify: `src/waterworks/scene/ChannelWater.tsx:9-11` (delete `INSET`), `:29` (the call)
 - Test: `src/waterworks/terrain/water.test.ts` (the existing `buildChannelRibbon` describe block)
 
 **Interfaces:**
 - Consumes: `WATER_SURFACE`, `waterHalfWidth` from Task 1.
 - Produces: `buildChannelRibbon(cut: ChannelCut, height: (x: number, z: number) => number)` — **the third parameter `inset` is removed.** Return shape is unchanged: `{ positions: Float32Array; uvs: Float32Array; colors: Float32Array; indices: Uint32Array }`.
+
+The sole call site is updated in this task rather than in Task 4, so the commit lands with `pnpm typecheck` green. Every task on this branch has ended clean and a deliberately red intermediate commit is not worth the review noise. Task 4 still owns the material constants.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -329,7 +332,7 @@ describe('buildChannelRibbon', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run src/waterworks/terrain/water.test.ts`
-Expected: FAIL. `stands above its own bed, by a visible amount` fails first with a negative difference around `-0.4`; `shows water at the surface in every channel` fails with `0` exposed.
+Expected: FAIL. `stands in its cut, neither buried nor overfilled` fails first with a negative difference around `-0.4`; `shows water at the surface in every channel` fails with `0` exposed.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -437,20 +440,36 @@ export function buildChannelRibbon(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Update the one call site**
+
+In `src/waterworks/scene/ChannelWater.tsx`, delete these three lines entirely — the constant and its comment:
+
+```ts
+// Lifts the surface off the bed, per buildChannelRibbon's contract — the same
+// figure every other scene component that samples the terrain leaves alone.
+const INSET = 0.1;
+```
+
+and change the call on line 29 from `buildChannelRibbon(cut, height, INSET)` to:
+
+```ts
+      const ribbon = buildChannelRibbon(cut, height);
+```
+
+Leave the `createWaterMaterial` call on line 55 alone — Task 4 owns it.
+
+- [ ] **Step 5: Run tests and typecheck to verify they pass**
 
 Run: `pnpm vitest run src/waterworks/terrain/water.test.ts`
 Expected: PASS, all describes green.
 
-Then run the whole suite — `ChannelWater.tsx` still passes a third argument, which is a type error, not a test failure:
-
 Run: `pnpm typecheck`
-Expected: FAIL with `TS2554: Expected 2 arguments, but got 3` at `src/waterworks/scene/ChannelWater.tsx:29`. Task 4 fixes it; do not fix it here.
+Expected: PASS, no output. If it reports `TS2554: Expected 2 arguments, but got 3`, Step 4 was missed.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/waterworks/terrain/water.ts src/waterworks/terrain/water.test.ts
+git add src/waterworks/terrain/water.ts src/waterworks/terrain/water.test.ts src/waterworks/scene/ChannelWater.tsx
 git commit -m "waterworks: place channel water by fill level so it stops being underground"
 ```
 
@@ -555,41 +574,22 @@ git commit -m "waterworks: grade the water against the soil it runs through, not
 
 ### Task 4: Wire the scene components to the shared constants
 
-`ChannelWater.tsx` still passes the removed `inset` argument (typecheck is red from Task 2), and both water components hardcode material numbers that Task 1 moved into `WATER_SURFACE`.
+Both water components hardcode material numbers that Task 1 moved into `WATER_SURFACE`. Task 2 already removed the `INSET` constant and fixed the call site, so this task is purely the material wiring.
 
 **Files:**
-- Modify: `src/waterworks/scene/ChannelWater.tsx:9-11` (the `INSET` constant), `:29` (the call), `:55` (the material)
-- Modify: `src/waterworks/scene/PoolWater.tsx:34` (the material)
+- Modify: `src/waterworks/scene/ChannelWater.tsx:6` (the import), `:55` (the material)
+- Modify: `src/waterworks/scene/PoolWater.tsx:6` (the import), `:34` (the material)
 
 **Interfaces:**
-- Consumes: `WATER_SURFACE` and the two-argument `buildChannelRibbon` from Tasks 1–2.
+- Consumes: `WATER_SURFACE` from Task 1.
 - Produces: no new exports.
 
-- [ ] **Step 1: Confirm the failure this task fixes**
+- [ ] **Step 1: Update ChannelWater**
 
-Run: `pnpm typecheck`
-Expected: FAIL with `TS2554: Expected 2 arguments, but got 3` at `src/waterworks/scene/ChannelWater.tsx:29`.
-
-- [ ] **Step 2: Update ChannelWater**
-
-In `src/waterworks/scene/ChannelWater.tsx`, delete these three lines entirely (the constant and its comment):
-
-```ts
-// Lifts the surface off the bed, per buildChannelRibbon's contract — the same
-// figure every other scene component that samples the terrain leaves alone.
-const INSET = 0.1;
-```
-
-Change the import on line 6 to bring in the constants:
+In `src/waterworks/scene/ChannelWater.tsx`, change the import on line 6 to bring in the constants:
 
 ```ts
 import { WATER_SURFACE, buildChannelRibbon } from '../terrain/water';
-```
-
-Change the call on line 29 from `buildChannelRibbon(cut, height, INSET)` to:
-
-```ts
-      const ribbon = buildChannelRibbon(cut, height);
 ```
 
 Change the material on line 55 to:
@@ -701,6 +701,16 @@ describe('the four pool-wall marks (spec §10.1)', () => {
     }
   });
 
+  it('keeps GA4 the deepest reach and Meta the shallowest', () => {
+    // §10.1: GA4's retention line is lowest on the wall, Meta's highest —
+    // that ordering IS the lesson of §5.4, that some things you can rebuild
+    // later and some you cannot. Guarded because the tuning in this task
+    // moves GA4's line, and a tuning pass must not quietly invert the point.
+    const frac = (id: string) => DENTIST_BASINS.find((b) => b.id === id)!.retentionFrac;
+    expect(frac('ga4')).toBeLessThan(frac('ads'));
+    expect(frac('ads')).toBeLessThan(frac('meta'));
+  });
+
   it('makes the retention line a different tone from the stone it marks', () => {
     // §10.1: the four marks survive only by differing in kind. At #5f5344 the
     // stain sat at 0.108 against silt at 0.106 — the same tone, so through
@@ -802,7 +812,17 @@ Run: `pnpm vitest run src/waterworks/content/marks.test.ts`
 Expected: PASS, 5 tests.
 
 Run: `pnpm vitest run && pnpm typecheck`
-Expected: PASS. Note the second `marks.test.ts` assertion is expected to hold for all four basins — GA4 clears it at `1.512 - 0.362 = 1.15` against a bound of `2.1 * 0.5 = 1.05`. **If GA4 fails it, that is a real finding, not a bad test:** it means GA4's `retentionFrac` of 0.12 puts its line too deep to ever be seen, and the fix is to raise `retentionFrac` toward 0.3 in `layout.ts` — GA4's line is meant to be *lowest on the wall*, not invisible. Make that change if the test demands it, and say so in the commit.
+Expected: **`keeps the retention line reachable through the water` FAILS on GA4, and that is the point of the test.** GA4's gap is `1.512 - 0.362 = 1.150` against a bound of `2.1 * 0.5 = 1.05`. The other three pass (Ads 0.111, Meta 0.002, final 1.042 against 1.2).
+
+This is a real finding about the content, not a bad test: `retentionFrac: 0.12` puts GA4's line so far under its own waterline that no plausible clarity would ever show it. **Fix it in the content** — in `src/waterworks/content/layout.ts`, change the `ga4` basin's `retentionFrac` from `0.12` to `0.3`:
+
+```ts
+  { id: 'ga4', label: 'GA4', center: { x: -14, z: 5 }, radius: 4.6, depth: 2.1, rimWidth: 1.5, retentionFrac: 0.3, flow: 0.65, fillFrac: 0.72 },
+```
+
+That gives a gap of `1.512 - (0.63 + 0.11) = 0.772`, inside the bound, and preserves what §10.1 needs: GA4's line stays **lowest of the three platform pools** (0.3 < Ads 0.42 < Meta 0.55). Do not instead lower `fillFrac` — level is what arrived and stayed, and GA4 holding the most water is the signature §10.1 gives it.
+
+Re-run after the change; all five tests should pass.
 
 - [ ] **Step 5: Commit**
 
@@ -884,4 +904,6 @@ git commit -m "waterworks: tune the water surfaces against the overlook and the 
 
 **Type consistency.** `WATER_SURFACE` members are referenced as `channelFill`, `widthSafety`, `freeboard`, `bedClearance`, `channelOpacity`, `channelRoughness`, `poolOpacity`, `poolRoughness` in Tasks 1, 2, 4 and 5 — one spelling throughout. `buildChannelRibbon` drops its third parameter in Task 2 and every call site is updated in Task 4; no other caller exists — `grep -rn buildChannelRibbon src` returns `water.ts`, `water.test.ts` and `ChannelWater.tsx`, plus one mention in `waterMaterial.ts` that is a doc comment about the V coordinate, not a call. `RETENTION_STAIN_HEIGHT` replaces the file-local `STAIN_HEIGHT` at both of its use sites in `Pools.tsx`.
 
-**Ordering.** Task 2 knowingly leaves `pnpm typecheck` red until Task 4 — called out in both tasks so an implementer working a single task does not chase it.
+**Ordering.** Every task ends with `pnpm vitest run` and `pnpm typecheck` green. Task 2 carries the one-line `ChannelWater.tsx` call-site update along with the signature change it forces, rather than deferring it to Task 4 and committing a knowingly-red intermediate.
+
+**Known failure that is not a defect.** Task 5's `keeps the retention line reachable through the water` fails on GA4 as written, deliberately, and the task text carries the content fix (`retentionFrac` 0.12 → 0.3) and the reason not to reach for `fillFrac` instead.

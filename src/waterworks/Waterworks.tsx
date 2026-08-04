@@ -6,6 +6,7 @@ import Camera, { OVERLOOK } from './scene/Camera';
 import Terrain from './scene/Terrain';
 import Channels from './scene/Channels';
 import Structures from './scene/Structures';
+import Pools from './scene/Pools';
 import ViewSwitch from './ViewSwitch';
 import Effects from './scene/Effects';
 import Lights from './scene/Lights';
@@ -40,6 +41,7 @@ export default function Waterworks() {
           <Terrain />
           <Channels />
           <Structures />
+          <Pools />
           <Effects />
           <Camera />
         </Suspense>

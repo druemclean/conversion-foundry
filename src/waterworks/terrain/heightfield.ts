@@ -324,8 +324,11 @@ export function srgbToLinear(channel: number): number {
   return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
 }
 
-/** Decode a '#rrggbb' palette entry into a linear-space RGB triple. */
-function linearFromHex(hex: string): [number, number, number] {
+/**
+ * Decode a '#rrggbb' palette entry into a linear-space RGB triple.
+ * Tests decode palette entries through this helper so the decode exists in exactly one place.
+ */
+export function linearFromHex(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [
     srgbToLinear(((n >> 16) & 255) / 255),

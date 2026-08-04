@@ -8,7 +8,7 @@ import {
   waterHalfWidth,
 } from './water';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
-import { carvedGround, carvedHeight, srgbToLinear } from './heightfield';
+import { carvedGround, carvedHeight, linearFromHex } from './heightfield';
 import { distanceToPolyline } from './path';
 import { WW_PALETTE } from '../tokens';
 
@@ -54,16 +54,25 @@ describe('waterColor', () => {
     // §7 makes the colour grade the only chart in the piece. A ramp that is
     // monotonic but sits below its background is a chart drawn in a colour
     // you cannot see — which is what 0.130 → 0.232 against soil at 0.339 was.
-    const n = parseInt(WW_PALETTE.soilDry.slice(1), 16);
-    const soil = luma([
-      srgbToLinear(((n >> 16) & 255) / 255),
-      srgbToLinear(((n >> 8) & 255) / 255),
-      srgbToLinear((n & 255) / 255),
-    ]);
+    const soil = luma(linearFromHex(WW_PALETTE.soilDry));
     expect(luma(waterColor(1))).toBeGreaterThan(soil);
     // And the muddy end must still read as darker than the bank, or there is
     // no grade left to see.
     expect(luma(waterColor(0))).toBeLessThan(soil * 0.65);
+    // ...but not so dark it stops being water. Without this floor a ramp
+    // running to black satisfies every other assertion in this file: the
+    // spread test stays satisfiable, and `loses its ochre warmth` compares
+    // r - b relatively, which black passes too. That is precisely the
+    // one-sided failure this suite exists to prevent.
+    expect(luma(waterColor(0))).toBeGreaterThan(soil * 0.3);
+  });
+
+  it('keeps real ochre in the rills', () => {
+    // Absolute, not relative. `loses its ochre warmth as it clears` only
+    // compares the two ends against each other, so a fully desaturated ramp
+    // passes it. The rills carry muddy water, and muddy water is warm.
+    const rills = waterColor(0);
+    expect(rills[0] - rills[2]).toBeGreaterThan(0.1);
   });
 
   it('spreads far enough across the ramp to be legible', () => {

@@ -11,6 +11,7 @@ import ViewSwitch from './ViewSwitch';
 import Effects from './scene/Effects';
 import Lights from './scene/Lights';
 import Sky from './scene/Sky';
+import Surround from './scene/Surround';
 
 export default function Waterworks() {
   return (
@@ -44,6 +45,7 @@ export default function Waterworks() {
         <Suspense fallback={null}>
           <Sky />
           <Lights />
+          <Surround />
           <Terrain />
           <Channels />
           <Structures />

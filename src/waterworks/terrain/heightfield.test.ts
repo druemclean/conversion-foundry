@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SURROUND,
+  buildSurroundGrid,
+  surroundHeight,
   baseFall,
   buildTerrainColors,
   buildTerrainGrid,
@@ -225,17 +228,49 @@ describe('buildTerrainGrid', () => {
   const flat = () => 2;
   const grid = buildTerrainGrid(flat);
 
-  it('spans the configured bounds at the configured resolution', () => {
-    expect(grid.nx).toBe(Math.round((TERRAIN.xMax - TERRAIN.xMin) / TERRAIN.res) + 1);
-    expect(grid.nz).toBe(Math.round((TERRAIN.zMax - TERRAIN.zMin) / TERRAIN.res) + 1);
+  it('spans the configured bounds plus a one-cell guard ring', () => {
+    expect(grid.nx).toBe(Math.round((TERRAIN.xMax - TERRAIN.xMin) / TERRAIN.res) + 3);
+    expect(grid.nz).toBe(Math.round((TERRAIN.zMax - TERRAIN.zMin) / TERRAIN.res) + 3);
   });
 
   it('emits three floats per vertex', () => {
     expect(grid.positions.length).toBe(grid.nx * grid.nz * 3);
   });
 
-  it('emits two triangles per cell', () => {
-    expect(grid.indices.length).toBe((grid.nx - 1) * (grid.nz - 1) * 6);
+  it('emits two triangles per cell, guard ring excluded', () => {
+    expect(grid.indices.length).toBe((grid.nx - 3) * (grid.nz - 3) * 6);
+  });
+
+  it('renders exactly the configured bounds despite the guard ring', () => {
+    // The guard ring exists only so the outermost rendered vertices have faces
+    // on both sides and get true normals. It must never widen what is drawn —
+    // the surround's hole is sized against these bounds.
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const idx of grid.indices) {
+      const v = idx * 3;
+      minX = Math.min(minX, grid.positions[v]);
+      maxX = Math.max(maxX, grid.positions[v]);
+      minZ = Math.min(minZ, grid.positions[v + 2]);
+      maxZ = Math.max(maxZ, grid.positions[v + 2]);
+    }
+    expect(minX).toBeCloseTo(TERRAIN.xMin, 6);
+    expect(maxX).toBeCloseTo(TERRAIN.xMax, 6);
+    expect(minZ).toBeCloseTo(TERRAIN.zMin, 6);
+    expect(maxZ).toBeCloseTo(TERRAIN.zMax, 6);
+  });
+
+  it('samples the guard ring outside those bounds', () => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i < grid.positions.length; i += 3) {
+      minX = Math.min(minX, grid.positions[i]);
+      maxX = Math.max(maxX, grid.positions[i]);
+    }
+    expect(minX).toBeCloseTo(TERRAIN.xMin - TERRAIN.res, 6);
+    expect(maxX).toBeCloseTo(TERRAIN.xMax + TERRAIN.res, 6);
   });
 
   it('samples the height function into Y', () => {
@@ -300,5 +335,110 @@ describe('srgbToLinear', () => {
       expect(v).toBeGreaterThan(prev);
       prev = v;
     }
+  });
+});
+
+describe('surroundHeight', () => {
+  it('matches the worked tile exactly along every boundary edge', () => {
+    // Continuity here is the whole point — a mismatch shows as a cliff or a
+    // crack at the horizon. Clamping guarantees it, so assert it holds.
+    for (let x = TERRAIN.xMin; x <= TERRAIN.xMax; x += 2.5) {
+      expect(surroundHeight(x, TERRAIN.zMin)).toBeCloseTo(surfaceHeight(x, TERRAIN.zMin), 9);
+      expect(surroundHeight(x, TERRAIN.zMax)).toBeCloseTo(surfaceHeight(x, TERRAIN.zMax), 9);
+    }
+    for (let z = TERRAIN.zMin; z <= TERRAIN.zMax; z += 2.5) {
+      expect(surroundHeight(TERRAIN.xMin, z)).toBeCloseTo(surfaceHeight(TERRAIN.xMin, z), 9);
+      expect(surroundHeight(TERRAIN.xMax, z)).toBeCloseTo(surfaceHeight(TERRAIN.xMax, z), 9);
+    }
+  });
+
+  it('is identical to the tile everywhere inside it', () => {
+    for (let x = -25; x <= 25; x += 10) {
+      for (let z = -35; z <= 35; z += 10) {
+        expect(surroundHeight(x, z)).toBeCloseTo(surfaceHeight(x, z), 9);
+      }
+    }
+  });
+
+  it('saturates instead of climbing to absurd heights', () => {
+    // Extending crossSlope itself would put the horizon 120 units in the air.
+    for (const at of [
+      { x: SURROUND.xMin, z: 0 },
+      { x: SURROUND.xMax, z: 0 },
+      { x: 0, z: SURROUND.zMin },
+      { x: 0, z: SURROUND.zMax },
+    ]) {
+      const h = surroundHeight(at.x, at.z);
+      expect(h).toBeLessThan(TERRAIN.ridgeHeight + 45);
+      expect(h).toBeGreaterThan(-30);
+    }
+  });
+
+  it('continues the landform rather than rolling uniformly away', () => {
+    // A uniform roll-away made the worked tile a mesa on a plinth. Uphill of
+    // the ridge the ground must keep climbing; below the outfall it must not.
+    const uphill = surroundHeight(0, TERRAIN.zMin - 80);
+    const atRidge = surroundHeight(0, TERRAIN.zMin);
+    expect(uphill).toBeGreaterThan(atRidge);
+
+    const sideways = surroundHeight(TERRAIN.xMax + 80, 0);
+    const atSide = surroundHeight(TERRAIN.xMax, 0);
+    expect(sideways).toBeGreaterThan(atSide);
+
+    const downhill = surroundHeight(0, TERRAIN.zMax + 80);
+    const atOutfall = surroundHeight(0, TERRAIN.zMax);
+    expect(downhill).toBeLessThan(atOutfall + 6);
+  });
+
+  it('is continuous across the boundary, not just equal on it', () => {
+    const justInside = surroundHeight(TERRAIN.xMax - 0.01, 0);
+    const justOutside = surroundHeight(TERRAIN.xMax + 0.01, 0);
+    expect(Math.abs(justInside - justOutside)).toBeLessThan(0.05);
+  });
+});
+
+describe('buildSurroundGrid', () => {
+  const grid = buildSurroundGrid();
+
+  it('spans the configured bounds at the configured resolution', () => {
+    expect(grid.nx).toBe(Math.round((SURROUND.xMax - SURROUND.xMin) / SURROUND.res) + 1);
+    expect(grid.nz).toBe(Math.round((SURROUND.zMax - SURROUND.zMin) / SURROUND.res) + 1);
+  });
+
+  it('keeps every index in range', () => {
+    const maxIndex = grid.nx * grid.nz - 1;
+    for (const idx of grid.indices) expect(idx).toBeLessThanOrEqual(maxIndex);
+  });
+
+  it('emits whole triangles only', () => {
+    expect(grid.indices.length % 3).toBe(0);
+    expect(grid.indices.length).toBeGreaterThan(0);
+  });
+
+  it('leaves a hole for the worked tile', () => {
+    // Every emitted triangle must have all three corners outside the hole,
+    // or the surround would render over the channels and basins.
+    for (let t = 0; t < grid.indices.length; t += 3) {
+      for (let k = 0; k < 3; k++) {
+        const v = grid.indices[t + k] * 3;
+        const x = grid.positions[v];
+        const z = grid.positions[v + 2];
+        const inHole =
+          Math.abs(x) < SURROUND.holeX && z > SURROUND.holeZMin && z < SURROUND.holeZMax;
+        expect(inHole).toBe(false);
+      }
+    }
+  });
+
+  it('overlaps the worked tile rather than butting against it', () => {
+    // The hole is smaller than the tile, so the two meshes share a band and
+    // cannot open a crack between them at any resolution mismatch. Which of
+    // the two wins that band is settled by polygonOffset on the surround's
+    // material, not by geometry — a real height step, however small, left a
+    // lit hairline tracing the tile's outline.
+    expect(SURROUND.holeX).toBeLessThan(TERRAIN.xMax);
+    expect(SURROUND.holeZMin).toBeGreaterThan(TERRAIN.zMin);
+    expect(SURROUND.holeZMax).toBeLessThan(TERRAIN.zMax);
+    expect(SURROUND.drop).toBe(0);
   });
 });

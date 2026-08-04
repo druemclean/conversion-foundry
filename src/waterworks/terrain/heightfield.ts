@@ -158,6 +158,110 @@ export function carvedHeight(
   return h;
 }
 
+export const SURROUND = {
+  xMin: -260,
+  xMax: 260,
+  zMin: -260,
+  zMax: 320,
+  /** Coarse — this is country seen from 200+ units away and mostly hazed. */
+  res: 5,
+  /** Inner hole, deliberately inside the worked tile so the two overlap. */
+  holeX: 28,
+  holeZMin: -38,
+  holeZMax: 38,
+  /** Kept at zero: a real height step, however small, left a lit hairline
+   *  tracing the tile's outline. Separation is done with polygonOffset on the
+   *  surround's material instead, which biases depth without moving geometry. */
+  drop: 0,
+} as const;
+
+/** The smooth landform without noise — used to read the outward gradient. */
+function smoothBase(x: number, z: number): number {
+  return baseFall(z) + crossSlope(x);
+}
+
+/**
+ * Ground beyond the worked tile.
+ *
+ * Continuity at the seam is the whole problem, so it is guaranteed by
+ * construction rather than by matching two formulas: clamping the sample back
+ * into the tile means that anywhere on the boundary this returns exactly the
+ * tile's own edge height, and `out` is zero there so nothing else applies.
+ *
+ * Extending the real heightfield instead was not an option — `crossSlope`
+ * grows as a 2.2 power, so at the horizon it would stand 120 units tall.
+ */
+export function surroundHeight(x: number, z: number): number {
+  const ex = Math.max(TERRAIN.xMin, Math.min(TERRAIN.xMax, x));
+  const ez = Math.max(TERRAIN.zMin, Math.min(TERRAIN.zMax, z));
+  const edge = surfaceHeight(ex, ez);
+
+  const out = Math.hypot(x - ex, z - ez);
+  if (out === 0) return edge;
+
+  // Continue the way the land was already going, read as a one-sided gradient
+  // from inside the tile. A uniform roll-away was wrong on three sides: it
+  // made the tile a mesa on a plinth, when uphill of the ridge the ground
+  // should keep climbing and sideways it should close into valley walls.
+  const dx = (x - ex) / out;
+  const dz = (z - ez) / out;
+  const gradient = smoothBase(ex, ez) - smoothBase(ex - dx, ez - dz);
+
+  // Saturating run, so the continuation levels into shoulders and a plain
+  // instead of climbing to the 120-unit horizon a raw crossSlope would give.
+  const REACH = 45;
+  const run = REACH * (1 - Math.exp(-out / REACH));
+  const relief =
+    (fbm2D(x * 0.012, z * 0.012, TERRAIN.seed + 91, 3) - 0.5) * Math.min(out, 60) * 0.25;
+
+  return edge + gradient * run + relief;
+}
+
+/**
+ * Sample the surround onto a coarse grid with a hole where the worked tile
+ * sits. Cells are emitted only when every corner is outside the hole, so the
+ * two meshes overlap by a couple of units and never leave a crack.
+ */
+export function buildSurroundGrid(): {
+  positions: Float32Array;
+  indices: Uint32Array;
+  nx: number;
+  nz: number;
+} {
+  const nx = Math.round((SURROUND.xMax - SURROUND.xMin) / SURROUND.res) + 1;
+  const nz = Math.round((SURROUND.zMax - SURROUND.zMin) / SURROUND.res) + 1;
+
+  const positions = new Float32Array(nx * nz * 3);
+  const inHole = new Uint8Array(nx * nz);
+
+  let p = 0;
+  for (let iz = 0; iz < nz; iz++) {
+    const z = SURROUND.zMin + iz * SURROUND.res;
+    for (let ix = 0; ix < nx; ix++) {
+      const x = SURROUND.xMin + ix * SURROUND.res;
+      positions[p++] = x;
+      positions[p++] = surroundHeight(x, z) - SURROUND.drop;
+      positions[p++] = z;
+      inHole[iz * nx + ix] =
+        Math.abs(x) < SURROUND.holeX && z > SURROUND.holeZMin && z < SURROUND.holeZMax ? 1 : 0;
+    }
+  }
+
+  const tris: number[] = [];
+  for (let iz = 0; iz < nz - 1; iz++) {
+    for (let ix = 0; ix < nx - 1; ix++) {
+      const a = iz * nx + ix;
+      const b = a + 1;
+      const c = a + nx;
+      const d = c + 1;
+      if (inHole[a] || inHole[b] || inHole[c] || inHole[d]) continue;
+      tris.push(a, c, b, b, c, d);
+    }
+  }
+
+  return { positions, indices: new Uint32Array(tris), nx, nz };
+}
+
 /**
  * Sample the height function onto a regular XZ grid. Returns raw typed arrays
  * rather than a BufferGeometry so this stays testable without a GL context.
@@ -168,17 +272,24 @@ export function buildTerrainGrid(height: (x: number, z: number) => number): {
   nx: number;
   nz: number;
 } {
-  const nx = Math.round((TERRAIN.xMax - TERRAIN.xMin) / TERRAIN.res) + 1;
-  const nz = Math.round((TERRAIN.zMax - TERRAIN.zMin) / TERRAIN.res) + 1;
+  // One guard ring of vertices outside the rendered area. computeVertexNormals
+  // averages the faces touching a vertex, so without it the outermost row only
+  // sees faces on its inward side and gets a normal tilted off the true
+  // surface — which lit a bright hairline tracing the tile's whole outline
+  // against the surround. The guard cells are sampled but never indexed, so
+  // the rendered extent is unchanged and the former boundary vertices now have
+  // faces on both sides.
+  const nx = Math.round((TERRAIN.xMax - TERRAIN.xMin) / TERRAIN.res) + 3;
+  const nz = Math.round((TERRAIN.zMax - TERRAIN.zMin) / TERRAIN.res) + 3;
 
   const positions = new Float32Array(nx * nz * 3);
-  const indices = new Uint32Array((nx - 1) * (nz - 1) * 6);
+  const indices = new Uint32Array((nx - 3) * (nz - 3) * 6);
 
   let p = 0;
   for (let iz = 0; iz < nz; iz++) {
-    const z = TERRAIN.zMin + iz * TERRAIN.res;
+    const z = TERRAIN.zMin + (iz - 1) * TERRAIN.res;
     for (let ix = 0; ix < nx; ix++) {
-      const x = TERRAIN.xMin + ix * TERRAIN.res;
+      const x = TERRAIN.xMin + (ix - 1) * TERRAIN.res;
       positions[p++] = x;
       positions[p++] = height(x, z);
       positions[p++] = z;
@@ -186,8 +297,8 @@ export function buildTerrainGrid(height: (x: number, z: number) => number): {
   }
 
   let t = 0;
-  for (let iz = 0; iz < nz - 1; iz++) {
-    for (let ix = 0; ix < nx - 1; ix++) {
+  for (let iz = 1; iz < nz - 2; iz++) {
+    for (let ix = 1; ix < nx - 2; ix++) {
       const a = iz * nx + ix;
       const b = a + 1;
       const c = a + nx;
@@ -235,8 +346,16 @@ const MOSS = linearFromHex(WW_PALETTE.moss);
  * Per-vertex soil colour. Dampness is inferred from how far a vertex sits
  * below undisturbed grade, so channels and basins read as wet earth with no
  * texture and no second material. Moss speckles the dry ground above.
+ *
+ * `reference` is the surface a vertex is compared against. The surround needs
+ * its own, because it deliberately rolls away below `surfaceHeight` — measured
+ * against the tile's grade the entire far country would read as one enormous
+ * wet stain.
  */
-export function buildTerrainColors(positions: Float32Array): Float32Array {
+export function buildTerrainColors(
+  positions: Float32Array,
+  reference: (x: number, z: number) => number = surfaceHeight,
+): Float32Array {
   const colors = new Float32Array(positions.length);
 
   for (let i = 0; i < positions.length; i += 3) {
@@ -244,7 +363,7 @@ export function buildTerrainColors(positions: Float32Array): Float32Array {
     const y = positions[i + 1];
     const z = positions[i + 2];
 
-    const cut = surfaceHeight(x, z) - y;
+    const cut = reference(x, z) - y;
     const damp = clamp01(cut / 1.2);
 
     let rgb = lerp3(SOIL_DRY, SOIL_DAMP, damp);

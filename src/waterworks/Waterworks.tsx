@@ -25,9 +25,11 @@ export default function Waterworks() {
         camera={{ position: OVERLOOK.position, fov: OVERLOOK.fov, near: 1, far: 400 }}
         onCreated={({ scene }) => {
           scene.background = new THREE.Color(WW_PALETTE.skyLow);
-          // Warm haze, not the Foundry's void — distance should read as dusty
-          // air over a valley, so the far ridge softens instead of vanishing.
-          scene.fog = new THREE.Fog(WW_PALETTE.haze, 150, 340);
+          // Warm haze, not the Foundry's void. The camera sits ~200 units out,
+          // and the terrain spans roughly 173-231 units from it, so fog has to
+          // start past the near edge or it milks the whole subject instead of
+          // just softening the far ridge.
+          scene.fog = new THREE.Fog(WW_PALETTE.haze, 205, 430);
         }}
       >
         <Suspense fallback={null}>

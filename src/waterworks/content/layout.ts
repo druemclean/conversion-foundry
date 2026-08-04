@@ -75,12 +75,19 @@ export const DENTIST_SLUICE_GATES = [
 }));
 
 /**
+ * Height of the retention-line band on a basin wall. Lives here rather than
+ * in the R3F component so a Node test can check the band against the
+ * waterline it sits under — spec §5.4 puts it below the surface by design.
+ */
+export const RETENTION_STAIN_HEIGHT = 0.22;
+
+/**
  * Three platform pools at the same elevation — peers, no hierarchy (§3, §10.1)
  * — and the final pool below them. Retention fractions differ per pool: GA4
  * reaches deepest, Meta shallowest (§10.1).
  */
 export const DENTIST_BASINS: BasinSpec[] = [
-  { id: 'ga4', label: 'GA4', center: { x: -14, z: 5 }, radius: 4.6, depth: 2.1, rimWidth: 1.5, retentionFrac: 0.12, flow: 0.65, fillFrac: 0.72 },
+  { id: 'ga4', label: 'GA4', center: { x: -14, z: 5 }, radius: 4.6, depth: 2.1, rimWidth: 1.5, retentionFrac: 0.3, flow: 0.65, fillFrac: 0.72 },
   { id: 'ads', label: 'Google Ads', center: { x: 0, z: 7 }, radius: 4.2, depth: 1.7, rimWidth: 1.4, retentionFrac: 0.42, flow: 0.65, fillFrac: 0.55 },
   { id: 'meta', label: 'Meta', center: { x: 13, z: 4 }, radius: 4.4, depth: 1.6, rimWidth: 1.4, retentionFrac: 0.55, flow: 0.65, fillFrac: 0.62 },
   { id: 'final', label: 'The pool', center: { x: 0, z: 25 }, radius: 6.4, depth: 2.4, rimWidth: 2.0, retentionFrac: 0.2, flow: 1.0, fillFrac: 0.68 },

@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS, type BasinSpec } from '../content/layout';
+import {
+  DENTIST_BASINS,
+  DENTIST_CHANNELS,
+  DENTIST_PADS,
+  RETENTION_STAIN_HEIGHT,
+  type BasinSpec,
+} from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
 import { WW_PALETTE } from '../tokens';
 
@@ -45,8 +51,6 @@ function GaugePost({ basin }: { basin: BasinSpec }) {
  * marking the lowest point a side channel can reach. Different height per
  * pool, and the asymmetry is the lesson.
  */
-const STAIN_HEIGHT = 0.22;
-
 function RetentionStain({ basin }: { basin: BasinSpec }) {
   const floor = floorOf(basin);
   const y = floor + basin.depth * basin.retentionFrac;
@@ -62,12 +66,19 @@ function RetentionStain({ basin }: { basin: BasinSpec }) {
   // at any height is (radius - rimWidth) + rimWidth * fraction. Slight outward
   // scale keeps the band clear of the terrain it sits against.
   const wallRadius = basin.radius - basin.rimWidth + basin.rimWidth * basin.retentionFrac;
-  const flare = (basin.rimWidth * (STAIN_HEIGHT / 2)) / basin.depth;
+  const flare = (basin.rimWidth * (RETENTION_STAIN_HEIGHT / 2)) / basin.depth;
 
   return (
     <mesh position={[basin.center.x, y, basin.center.z]}>
       <cylinderGeometry
-        args={[(wallRadius + flare) * 1.006, (wallRadius - flare) * 1.006, STAIN_HEIGHT, 64, 1, true]}
+        args={[
+          (wallRadius + flare) * 1.006,
+          (wallRadius - flare) * 1.006,
+          RETENTION_STAIN_HEIGHT,
+          64,
+          1,
+          true,
+        ]}
       />
       <meshStandardMaterial
         color={WW_PALETTE.retentionStain}

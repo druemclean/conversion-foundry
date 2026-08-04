@@ -23,7 +23,13 @@ export const WW_PALETTE = {
   moss: '#6c7b4b',
   gorse: '#909657',
 
-  retentionStain: '#5f5344',
+  /**
+   * A pale mineral tide line, not a dark stain. §10.1 needs the four
+   * pool-wall marks to differ in kind, and the previous #5f5344 sat at the
+   * same luminance as the silt beside it — so it read as shadow, which is
+   * the one thing a mark must not do.
+   */
+  retentionStain: '#cfc4ab',
 } as const;
 
 export type WwColor = keyof typeof WW_PALETTE;

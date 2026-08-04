@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS, type BasinSpec } from '../content/layout';
 import { carvedHeight } from '../terrain/heightfield';
-import { waterColor } from '../terrain/water';
+import { WATER_SURFACE, waterColor } from '../terrain/water';
 import { createWaterMaterial, type WaterMaterial } from './waterMaterial';
 
 function floorOf(basin: BasinSpec): number {
@@ -31,7 +31,13 @@ export default function PoolWater() {
       const y = floor + basin.depth * basin.fillFrac;
       const geometry = new THREE.CircleGeometry(basin.radius - basin.rimWidth * 0.5, 48);
 
-      const material = createWaterMaterial({ roughness: 0.08, opacity: 0.9 });
+      // Spec §5.4 puts the retention line and the silt below the waterline by
+      // definition. At the old 0.9 the pools were opaque and both marks
+      // rendered to nothing — two of §10.1's four went missing.
+      const material = createWaterMaterial({
+        roughness: WATER_SURFACE.poolRoughness,
+        opacity: WATER_SURFACE.poolOpacity,
+      });
       // A pool is one flat tone — vertex colours are the channel's device,
       // not this one. Turning them off matters: the geometry below carries no
       // 'color' attribute, and leaving vertexColors on would multiply the

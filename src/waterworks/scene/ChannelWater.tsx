@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DENTIST_BASINS, DENTIST_CHANNELS, DENTIST_PADS } from '../content/layout';
 import { carvedGround, carvedHeight } from '../terrain/heightfield';
-import { buildChannelRibbon } from '../terrain/water';
+import { WATER_SURFACE, buildChannelRibbon } from '../terrain/water';
 import { createWaterMaterial } from './waterMaterial';
 
 /**
@@ -51,7 +51,14 @@ export default function ChannelWater() {
     return geom;
   }, []);
 
-  const material = useMemo(() => createWaterMaterial({ roughness: 0.2, opacity: 0.88 }), []);
+  const material = useMemo(
+    () =>
+      createWaterMaterial({
+        roughness: WATER_SURFACE.channelRoughness,
+        opacity: WATER_SURFACE.channelOpacity,
+      }),
+    [],
+  );
 
   // R3F only auto-disposes objects it attached itself via JSX children.
   // `geometry` and `material` are built imperatively and handed to the mesh

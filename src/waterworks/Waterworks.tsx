@@ -1,6 +1,9 @@
 import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
 import * as THREE from 'three';
+import { WW_PALETTE } from './tokens';
+import Camera, { OVERLOOK } from './scene/Camera';
+import Terrain from './scene/Terrain';
 import ViewSwitch from './ViewSwitch';
 
 export default function Waterworks() {
@@ -16,12 +19,16 @@ export default function Waterworks() {
           toneMapping: THREE.NoToneMapping,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
-        camera={{ position: [0, 120, 165], fov: 22, near: 1, far: 400 }}
+        camera={{ position: OVERLOOK.position, fov: OVERLOOK.fov, near: 1, far: 400 }}
         onCreated={({ scene }) => {
-          scene.background = new THREE.Color('#e7dcc7');
+          scene.background = new THREE.Color(WW_PALETTE.skyLow);
         }}
       >
-        <Suspense fallback={null} />
+        <Suspense fallback={null}>
+          <ambientLight intensity={1.2} />
+          <Terrain />
+          <Camera />
+        </Suspense>
       </Canvas>
       <ViewSwitch current="waterworks" />
     </div>

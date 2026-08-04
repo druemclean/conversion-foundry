@@ -70,12 +70,13 @@ export default function Channels() {
   }, []);
 
   // R3F does not dispose objects rendered through <primitive> — they are ours.
-  // Same reason as Terrain's geometry and Sky's material; the hash route
-  // unmounts this view every time the viewer switches explainers.
+  // An InstancedMesh needs all three: instanceMatrix is a buffer on the mesh
+  // itself, not in geometry.attributes, so only mesh.dispose() releases it.
   useEffect(() => {
     return () => {
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
+      mesh.dispose();
     };
   }, [mesh]);
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { DENTIST_BASINS, DENTIST_CHANNELS } from '../content/layout';
 import { buildTerrainColors, buildTerrainGrid, carvedHeight } from '../terrain/heightfield';
@@ -18,6 +18,12 @@ export default function Terrain() {
     geom.computeBoundingSphere();
     return geom;
   }, []);
+
+  // R3F only auto-disposes objects it attached via JSX. `geometry` is handed
+  // to the mesh as a prop, so its GPU buffers are ours to release — and the
+  // hash route unmounts this whole view every time the viewer switches
+  // explainers.
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <mesh geometry={geometry} receiveShadow castShadow>
